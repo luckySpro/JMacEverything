@@ -1,3 +1,5 @@
+> **JMacEverything** — a fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (MIT) with a redesigned UI plus keyboard navigation, Quick Look, type filters and sorting. See [FORK_CHANGES.md](FORK_CHANGES.md).
+
 <p align="center">
   <img src="MacEverything/Assets.xcassets/AppIcon.appiconset/icon_256.png" alt="MacEverything" width="128" />
 </p>

@@ -1,0 +1,66 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-15   # Apple Silicon runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install re2 dylibbundler
+
+      - name: Core tests (fast)
+        run: make test-fast
+
+      - name: Build app (unsigned)
+        run: |
+          xcodebuild -project MacEverything.xcodeproj -scheme MacEverything \
+            -configuration Release -destination 'platform=macOS,arch=arm64' \
+            SYMROOT=build CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM="" build
+
+      - name: Bundle Homebrew dylibs into the app
+        run: |
+          APP=build/Release/MacEverything.app
+          dylibbundler -od -b -cd \
+            -x "$APP/Contents/MacOS/MacEverything" \
+            -d "$APP/Contents/Frameworks" \
+            -p @executable_path/../Frameworks/
+          # Fail if anything still points at Homebrew
+          ! otool -L "$APP/Contents/MacOS/MacEverything" | grep -q /opt/homebrew
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep "$APP"
+
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF" == refs/tags/* ]] || VERSION="dev-${GITHUB_SHA::7}"
+          mkdir -p dist
+          ditto -c -k --keepParent build/Release/MacEverything.app "dist/JMacEverything-$VERSION-arm64.zip"
+          hdiutil create -volname JMacEverything -srcfolder build/Release/MacEverything.app \
+            -ov -format UDZO "dist/JMacEverything-$VERSION-arm64.dmg"
+          (cd dist && shasum -a 256 * > SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JMacEverything-macos-arm64
+          path: dist/*
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "JMacEverything $GITHUB_REF_NAME" \
+            --notes-file FORK_CHANGES.md

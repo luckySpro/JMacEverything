@@ -1,3 +1,5 @@
+> **JMacEverything** — 本仓库 fork 自 [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything)（MIT），重做了界面并新增键盘导航、Quick Look、类型筛选、排序等功能，详见 [FORK_CHANGES.md](FORK_CHANGES.md)。
+
 <p align="center">
   <img src="MacEverything/Assets.xcassets/AppIcon.appiconset/icon_256.png" alt="MacEverything" width="128" />
 </p>

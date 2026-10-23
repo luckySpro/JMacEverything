@@ -22,5 +22,8 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 ## Files touched
 `App/ContentView.swift` (rewritten), `App/ResultRow.swift`, `App/ContentResultRow.swift`, `App/SearchOptions.swift`, `App/HighlightedSearchField.swift`, `App/MacEverythingApp.swift`. No new files were added, so the Xcode project needs no changes.
 
+## Release
+Bump `CFBundleShortVersionString` (and `CFBundleVersion`) in `MacEverything/Info.plist` and push to `main`: CI builds, tags `vX.Y.Z` and publishes the release with zip, dmg and SHA256SUMS. Builds are ad-hoc signed (not notarized): first launch needs right-click → Open.
+
 ## Build
 Open `MacEverything.xcodeproj` in Xcode (macOS 14+, `brew install re2`), choose your signing team, ⌘R.

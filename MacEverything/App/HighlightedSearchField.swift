@@ -163,6 +163,8 @@ struct HighlightedSearchField: NSViewRepresentable {
     var ghostSuggestion: String?
     var isFocused: FocusState<Bool>.Binding
     var onTab: (() -> Bool)?
+    /// Navigation / action keys typed while the field has focus.
+    var onKeyCommand: ((SearchKeyCommand) -> Bool)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -179,7 +181,7 @@ struct HighlightedSearchField: NSViewRepresentable {
         let textView = HighlightedNSTextView()
         textView.isRichText = false
         textView.allowsUndo = true
-        textView.font = .systemFont(ofSize: 26)
+        textView.font = .systemFont(ofSize: SearchFieldMetrics.fontSize, weight: .regular)
         textView.textColor = .labelColor
         textView.backgroundColor = .clear
         textView.drawsBackground = false
@@ -200,6 +202,9 @@ struct HighlightedSearchField: NSViewRepresentable {
 
         // Tab key handling
         textView.onTabKey = context.coordinator.handleTab
+        textView.onKeyCommand = { [weak coordinator = context.coordinator] cmd in
+            coordinator?.parent.onKeyCommand?(cmd) ?? false
+        }
 
         // Placeholder
         textView.placeholderString = placeholder
@@ -212,6 +217,7 @@ struct HighlightedSearchField: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? HighlightedNSTextView else { return }
+        context.coordinator.parent = self
 
         // Update text if externally changed (e.g., clear button, ghost suggestion accept)
         if textView.string != text {
@@ -271,7 +277,7 @@ struct HighlightedSearchField: NSViewRepresentable {
             guard let textStorage = textView.textStorage else { return }
             let fullRange = NSRange(location: 0, length: textStorage.length)
             let text = textStorage.string
-            let font = NSFont.systemFont(ofSize: 26)
+            let font = NSFont.systemFont(ofSize: SearchFieldMetrics.fontSize, weight: .regular)
 
             // Reset to default style
             textStorage.beginEditing()
@@ -309,8 +315,17 @@ struct HighlightedSearchField: NSViewRepresentable {
 
 // MARK: - Custom NSTextView subclass for Tab key handling
 
+enum SearchFieldMetrics {
+    static let fontSize: CGFloat = 22
+}
+
+enum SearchKeyCommand {
+    case up, down, pageUp, pageDown, open, reveal, quickLook, copyPath, escape
+}
+
 class HighlightedNSTextView: NSTextView {
     var onTabKey: (() -> Bool)?
+    var onKeyCommand: ((SearchKeyCommand) -> Bool)?
     var placeholderString: String = ""
     var ghostSuggestion: String? {
         didSet { needsDisplay = true }
@@ -323,6 +338,22 @@ class HighlightedNSTextView: NSTextView {
                 return // Tab was consumed by ghost suggestion
             }
         }
+        if let handler = onKeyCommand {
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            var cmd: SearchKeyCommand?
+            switch event.keyCode {
+            case 126: cmd = .up
+            case 125: cmd = .down
+            case 116: cmd = .pageUp
+            case 121: cmd = .pageDown
+            case 36, 76: cmd = flags.contains(.command) ? .reveal : .open
+            case 53: cmd = .escape
+            case 16 where flags.contains(.command): cmd = .quickLook          // ⌘Y
+            case 8 where flags.contains([.command, .option]): cmd = .copyPath // ⌥⌘C
+            default: break
+            }
+            if let cmd, handler(cmd) { return }
+        }
         super.keyDown(with: event)
     }
 
@@ -330,7 +361,7 @@ class HighlightedNSTextView: NSTextView {
         // Draw ghost suggestion behind the real text (before super.draw paints the typed text)
         if let ghost = ghostSuggestion, !ghost.isEmpty, !string.isEmpty {
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: font ?? NSFont.systemFont(ofSize: 26),
+                .font: font ?? NSFont.systemFont(ofSize: SearchFieldMetrics.fontSize),
                 .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.4),
             ]
             let ghostStr = NSAttributedString(string: ghost, attributes: attrs)
@@ -347,7 +378,7 @@ class HighlightedNSTextView: NSTextView {
         // Draw placeholder when empty
         if string.isEmpty && !placeholderString.isEmpty {
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: font ?? NSFont.systemFont(ofSize: 26),
+                .font: font ?? NSFont.systemFont(ofSize: SearchFieldMetrics.fontSize),
                 .foregroundColor: NSColor.placeholderTextColor,
             ]
             let placeholder = NSAttributedString(string: placeholderString, attributes: attrs)

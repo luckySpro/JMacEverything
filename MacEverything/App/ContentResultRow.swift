@@ -4,6 +4,8 @@ import AppKit
 struct ContentResultRow: View {
     let item: ContentFileItem
     let keyword: String
+    var isSelected: Bool = false
+    var onSelect: (() -> Void)? = nil
     @State private var isHovered = false
 
     var body: some View {
@@ -11,7 +13,7 @@ struct ContentResultRow: View {
             fileIcon(for: item.filePath)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 24, height: 24)
+                .frame(width: 32, height: 32)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -38,17 +40,15 @@ struct ContentResultRow: View {
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isHovered ? Color.accentColor.opacity(0.12) : Color.clear)
+                .fill(isSelected ? Color.accentColor.opacity(0.22)
+                      : (isHovered ? Color.primary.opacity(0.05) : Color.clear))
         )
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovered = hovering
         }
         .contextMenu {
-            Button("Open") { openFile() }
-            Button("Reveal in Finder") { revealInFinder() }
-            Divider()
-            Button("Copy Path") { copyPath() }
+            FileContextMenu(path: item.filePath, isDirectory: false, isApp: false)
         }
         .onDrag {
             return NSItemProvider(object: NSURL(fileURLWithPath: item.filePath))
@@ -60,11 +60,7 @@ struct ContentResultRow: View {
                 openFile()
             }
         }
-        .onTapGesture(count: 1) {
-            if NSEvent.modifierFlags.contains(.command) {
-                revealInFinder()
-            }
-        }
+        .simultaneousGesture(TapGesture().onEnded { onSelect?() })
         .accessibilityIdentifier("contentResultRow")
     }
 

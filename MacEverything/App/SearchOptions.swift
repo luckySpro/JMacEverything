@@ -31,6 +31,9 @@ class SearchOptions: ObservableObject {
         }
     }
 
+    /// Quick file-kind filter chosen from the chip bar under the search field.
+    @Published var typeFilter: TypeFilter = .all
+
     private init() {}
 
     var hasActiveOptions: Bool {
@@ -45,7 +48,58 @@ class SearchOptions: ObservableObject {
         if isCaseSensitive { prefix += "case:" }
         if isWholeWord { prefix += "ww:" }
         if isMatchFilename { prefix += "wfn:" }
-        return prefix + keyword
+        let kind = typeFilter.query.isEmpty ? "" : typeFilter.query + " "
+        return kind + prefix + keyword
+    }
+}
+
+/// File-kind filters exposed as chips. Each maps to Everything-style query syntax
+/// understood by the C++ engine (see Search Syntax Help → File Type Macros).
+enum TypeFilter: String, CaseIterable, Identifiable {
+    case all, apps, folders, documents, images, video, audio, code, archives
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .apps: return "Apps"
+        case .folders: return "Folders"
+        case .documents: return "Documents"
+        case .images: return "Images"
+        case .video: return "Video"
+        case .audio: return "Audio"
+        case .code: return "Code"
+        case .archives: return "Archives"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .all: return "square.grid.2x2"
+        case .apps: return "app.badge"
+        case .folders: return "folder"
+        case .documents: return "doc.text"
+        case .images: return "photo"
+        case .video: return "film"
+        case .audio: return "waveform"
+        case .code: return "chevron.left.forwardslash.chevron.right"
+        case .archives: return "archivebox"
+        }
+    }
+
+    var query: String {
+        switch self {
+        case .all: return ""
+        case .apps: return "ext:app"
+        case .folders: return "folder:"
+        case .documents: return "doc:"
+        case .images: return "pic:"
+        case .video: return "video:"
+        case .audio: return "audio:"
+        case .code: return "ext:swift;m;mm;c;cc;cpp;h;hpp;py;js;jsx;ts;tsx;go;rs;java;kt;rb;php;sh;zsh;lua;cs;vue;html;css;scss;json;yaml;yml;toml;sql"
+        case .archives: return "zip:"
+        }
     }
 }
 

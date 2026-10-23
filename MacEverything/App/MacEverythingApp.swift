@@ -9,8 +9,9 @@ struct MacEverythingApp: App {
         Window("MacEverything", id: "main") {
             ContentView()
         }
-        .windowStyle(.titleBar)
-        .defaultSize(width: 800, height: 600)
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 860, height: 620)
         .commands {
             CommandMenu("Search") {
                 Toggle("Regex", isOn: $searchOptions.isRegex)
@@ -21,6 +22,13 @@ struct MacEverythingApp: App {
                     .keyboardShortcut("w", modifiers: [.command, .shift])
                 Toggle("Match Filename", isOn: $searchOptions.isMatchFilename)
                     .keyboardShortcut("f", modifiers: [.command, .shift])
+            }
+
+            CommandMenu("Filter") {
+                ForEach(Array(TypeFilter.allCases.enumerated()), id: \.element) { idx, f in
+                    Button(f.title) { searchOptions.typeFilter = f }
+                        .keyboardShortcut(KeyEquivalent(Character("\(idx)")), modifiers: [.command])
+                }
             }
 
             CommandGroup(replacing: .help) {

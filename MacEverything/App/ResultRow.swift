@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 /// Shared icon cache to avoid repeated NSWorkspace.shared.icon(forFile:) calls.
 /// - App bundles (type=5): cached by full path (each app has a unique icon)
@@ -37,7 +38,7 @@ final class FileIconCache {
 
         let fullPath = item.path + "/" + item.name
         let nsImage = NSWorkspace.shared.icon(forFile: fullPath)
-        nsImage.size = NSSize(width: 24, height: 24)
+        nsImage.size = NSSize(width: 32, height: 32)
         cache.setObject(nsImage, forKey: nsKey)
         return nsImage
     }
@@ -49,112 +50,215 @@ final class FileIconCache {
             return cached
         }
         let nsImage = NSWorkspace.shared.icon(forFile: path)
-        nsImage.size = NSSize(width: 24, height: 24)
+        nsImage.size = NSSize(width: 32, height: 32)
         cache.setObject(nsImage, forKey: key)
         return nsImage
+    }
+}
+
+// MARK: - File actions (shared by rows, context menus and keyboard shortcuts)
+
+enum FileActions {
+    static func fullPath(_ item: FileItem) -> String { item.path + "/" + item.name }
+
+    static func open(_ path: String, isApp: Bool = false) {
+        let url = URL(fileURLWithPath: path)
+        if isApp {
+            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+        } else if !NSWorkspace.shared.open(url) {
+            NSSound.beep()
+        }
+    }
+
+    static func open(_ item: FileItem) {
+        open(fullPath(item), isApp: item.type == 5 || item.name.hasSuffix(".app"))
+    }
+
+    static func reveal(_ path: String) {
+        NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "")
+    }
+
+    static func copy(_ string: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(string, forType: .string)
+    }
+
+    /// Quick Look preview via the system qlmanage helper (app is not sandboxed).
+    static func quickLook(_ path: String) {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/qlmanage")
+        p.arguments = ["-p", path]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        try? p.run()
+        // qlmanage opens behind us; bring its panel forward shortly after launch.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            NSRunningApplication(processIdentifier: p.processIdentifier)?.activate()
+        }
+    }
+
+    static func openInTerminal(_ path: String, isDirectory: Bool) {
+        let dir = isDirectory ? path : (path as NSString).deletingLastPathComponent
+        guard let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else { return }
+        NSWorkspace.shared.open([URL(fileURLWithPath: dir)], withApplicationAt: terminal,
+                                configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    static func openWith(_ path: String) {
+        let panel = NSOpenPanel()
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.allowedContentTypes = [.application]
+        panel.prompt = "Open"
+        panel.message = "Choose an application to open \((path as NSString).lastPathComponent)"
+        if panel.runModal() == .OK, let app = panel.url {
+            NSWorkspace.shared.open([URL(fileURLWithPath: path)], withApplicationAt: app,
+                                    configuration: NSWorkspace.OpenConfiguration())
+        }
+    }
+
+    /// Moves to Trash (recoverable), never deletes permanently.
+    static func moveToTrash(_ path: String) {
+        NSWorkspace.shared.recycle([URL(fileURLWithPath: path)]) { _, error in
+            if error != nil { NSSound.beep() }
+        }
+    }
+
+    static func formatSize(_ bytes: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bitPattern: bytes), countStyle: .file)
+    }
+
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f
+    }()
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+
+    /// "5 min. ago" for the last week, a calendar date otherwise.
+    static func formatDate(_ t: time_t) -> String {
+        guard t > 0 else { return "—" }
+        let date = Date(timeIntervalSince1970: TimeInterval(t))
+        if Date().timeIntervalSince(date) < 7 * 24 * 3600 {
+            return relativeFormatter.localizedString(for: date, relativeTo: Date())
+        }
+        return dateFormatter.string(from: date)
+    }
+
+    static func kind(_ item: FileItem) -> String {
+        if item.name.hasSuffix(".app") { return "Application" }
+        switch item.type {
+        case 2: return "Folder"
+        case 3: return "Symlink"
+        case 5: return "Application"
+        default:
+            let ext = (item.name as NSString).pathExtension
+            return ext.isEmpty ? "File" : ext.uppercased()
+        }
+    }
+}
+
+/// Shared context menu for any result path.
+struct FileContextMenu: View {
+    let path: String
+    let isDirectory: Bool
+    let isApp: Bool
+
+    var body: some View {
+        Button { FileActions.open(path, isApp: isApp) } label: { Label("Open", systemImage: "arrow.up.forward.app") }
+        Button { FileActions.openWith(path) } label: { Label("Open With…", systemImage: "square.and.arrow.up.on.square") }
+        Button { FileActions.reveal(path) } label: { Label("Reveal in Finder", systemImage: "folder") }
+        Button { FileActions.quickLook(path) } label: { Label("Quick Look", systemImage: "eye") }
+        Button { FileActions.openInTerminal(path, isDirectory: isDirectory) } label: { Label("Open in Terminal", systemImage: "terminal") }
+        Divider()
+        Button { FileActions.copy(path) } label: { Label("Copy Path", systemImage: "doc.on.doc") }
+        Button { FileActions.copy((path as NSString).lastPathComponent) } label: { Label("Copy Name", systemImage: "textformat") }
+        Button { FileActions.copy((path as NSString).deletingLastPathComponent) } label: { Label("Copy Parent Folder", systemImage: "folder.badge.questionmark") }
+        Divider()
+        Button(role: .destructive) { FileActions.moveToTrash(path) } label: { Label("Move to Trash", systemImage: "trash") }
     }
 }
 
 struct ResultRow: View {
     let item: FileItem
     let hints: [HighlightHint]
+    var isSelected: Bool = false
+    var onSelect: (() -> Void)? = nil
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            fileIcon(for: item)
+        HStack(spacing: 12) {
+            Image(nsImage: FileIconCache.shared.icon(for: item))
                 .resizable()
+                .interpolation(.high)
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 24, height: 24)
+                .frame(width: 32, height: 32)
 
             VStack(alignment: .leading, spacing: 2) {
                 let highlighted = highlightCrossMatches(
                     path: item.path, name: item.name, hints: hints,
-                    nameFont: .title3, nameColor: .primary,
-                    pathFont: .subheadline, pathColor: .secondary)
+                    nameFont: .system(size: 14, weight: .medium), nameColor: .primary,
+                    pathFont: .system(size: 11.5), pathColor: .secondary)
                 highlighted.nameText.lineLimit(1)
-                highlighted.pathText.lineLimit(1)
+                highlighted.pathText.lineLimit(1).truncationMode(.middle)
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
-            if item.type == 1 && item.size > 0 {
-                Text(formatSize(item.size))
-                    .font(.subheadline)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(FileActions.formatDate(item.modTime))
+                    .font(.system(size: 11.5))
                     .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    Text(FileActions.kind(item))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(Color.primary.opacity(0.06)))
+                    if item.type == 1 && item.size > 0 {
+                        Text(FileActions.formatSize(item.size))
+                            .font(.system(size: 11.5).monospacedDigit())
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
+            .frame(minWidth: 110, alignment: .trailing)
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isHovered ? Color.accentColor.opacity(0.12) : Color.clear)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.22)
+                      : (isHovered ? Color.primary.opacity(0.05) : Color.clear))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.45) : Color.clear, lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onHover { hovering in
-            isHovered = hovering
-        }
+        .onHover { isHovered = $0 }
         .contextMenu {
-            Button("Open") { openFile(item) }
-            Button("Reveal in Finder") { revealInFinder(item) }
-            Divider()
-            Button("Copy Path") { copyPath(item) }
+            FileContextMenu(path: FileActions.fullPath(item),
+                            isDirectory: item.type == 2,
+                            isApp: item.name.hasSuffix(".app"))
         }
         .onDrag {
-            let fullPath = item.path + "/" + item.name
-            return NSItemProvider(object: NSURL(fileURLWithPath: fullPath))
+            NSItemProvider(object: NSURL(fileURLWithPath: FileActions.fullPath(item)))
         }
         .onTapGesture(count: 2) {
             if NSEvent.modifierFlags.contains(.command) {
-                revealInFinder(item)
+                FileActions.reveal(FileActions.fullPath(item))
             } else {
-                openFile(item)
+                FileActions.open(item)
             }
         }
-        .onTapGesture(count: 1) {
-            if NSEvent.modifierFlags.contains(.command) {
-                revealInFinder(item)
-            }
-        }
+        .simultaneousGesture(TapGesture().onEnded { onSelect?() })
         .accessibilityIdentifier("resultRow")
-    }
-
-    private func fileIcon(for item: FileItem) -> Image {
-        Image(nsImage: FileIconCache.shared.icon(for: item))
-    }
-
-    private func formatSize(_ bytes: UInt64) -> String {
-        let units = ["B", "KB", "MB", "GB", "TB"]
-        var size = Double(bytes)
-        var unitIndex = 0
-        while size >= 1024 && unitIndex < units.count - 1 {
-            size /= 1024
-            unitIndex += 1
-        }
-        if unitIndex == 0 { return "\(bytes) B" }
-        return String(format: "%.1f %@", size, units[unitIndex])
-    }
-
-    private func openFile(_ item: FileItem) {
-        let fullPath = item.path + "/" + item.name
-        if item.type == 5 {
-            let url = URL(fileURLWithPath: fullPath)
-            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-        } else {
-            if !NSWorkspace.shared.open(URL(fileURLWithPath: fullPath)) {
-                NSSound.beep()
-            }
-        }
-    }
-
-    private func revealInFinder(_ item: FileItem) {
-        let fullPath = item.path + "/" + item.name
-        NSWorkspace.shared.selectFile(fullPath, inFileViewerRootedAtPath: "")
-    }
-
-    private func copyPath(_ item: FileItem) {
-        let fullPath = item.path + "/" + item.name
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(fullPath, forType: .string)
     }
 }

@@ -15,6 +15,11 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 
 ![Color cards (design mock)](docs/design/color-cards.png)
 
+## 1.10 — Always in the menu bar
+- Closing the window, ⌘Q and the Dock's "Quit" now only hide JMacEverything; it keeps indexing in the menu bar and the hotkey (⌥Space) brings it back instantly
+- Only **Quit JMacEverything** in the menu-bar icon's menu really quits (logout, restart and shutdown still quit normally)
+- Toggle **Keep Running in Menu Bar** in that menu to restore the old behaviour; clicking the Dock icon reopens the window
+
 ## 1.9 — Memory diet
 - `pathIndex_` (full path → record) stored every full path a second time as a `std::string` key: ~0.5 GB for 2.5M files. It now keeps only a 64-bit hash per file in an open-addressed table (`Core/PathIndexMap.h`), ~65 MB. Prefix deletes rebuild the path from the existing pools. Verified against the old engine with a randomized add/remove/update/prefix-rescan/compaction test (ASan clean, identical results).
 - Trigram / path / extension posting lists drop their growth slack after building (~85 MB+ on large disks).

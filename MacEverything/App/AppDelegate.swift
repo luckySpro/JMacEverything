@@ -7,6 +7,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var launchAtLoginItem: NSMenuItem?
     private var mcpMenuItems: [MCPClient: NSMenuItem] = [:]
     private(set) var mainSearchWindow: NSWindow?
+    private var keepResidentItem: NSMenuItem?
+    /// Set only by the menu-bar "Quit" item; every other quit request just hides the app.
+    private var userConfirmedQuit = false
+
+    /// Stay in the menu bar when the window is closed, ⌘Q is pressed or the Dock's "Quit" is chosen.
+    static var keepResident: Bool {
+        get { UserDefaults.standard.object(forKey: "keepResidentInMenuBar") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "keepResidentInMenuBar") }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         MacSearchBridge.initializeLogger()
@@ -31,6 +40,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if Self.keepResident && !userConfirmedQuit && !Self.isSystemSessionEnding() {
+            // ⌘Q / Dock "Quit": keep indexing in the background, just get out of the way.
+            mainSearchWindow?.orderOut(nil)
+            NSApp.hide(nil)
+            return .terminateCancel
+        }
         DispatchQueue.global(qos: .userInitiated).async {
             MacSearchBridge.shared().prepareForTermination()
             DispatchQueue.main.async {
@@ -38,6 +53,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         return .terminateLater
+    }
+
+    /// Clicking the Dock icon brings the search window back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        NSApp.activate(ignoringOtherApps: true)
+        mainSearchWindow?.makeKeyAndOrderFront(nil)
+        return true
+    }
+
+    /// True when macOS asks us to quit for logout, restart or shutdown (the quit Apple event
+    /// then carries a reason). Those must always be honoured.
+    private static func isSystemSessionEnding() -> Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent,
+              event.eventClass == kCoreEventClass,
+              event.eventID == kAEQuitApplication else { return false }
+        let quitReasonKey: AEKeyword = 0x7768_793F // 'why?' (keyAEQuitReason)
+        return event.attributeDescriptor(forKeyword: quitReasonKey) != nil
+            || event.paramDescriptor(forKeyword: quitReasonKey) != nil
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -77,6 +110,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchAtLoginItem = loginItem
         menu.addItem(loginItem)
+        let residentItem = NSMenuItem(title: "Keep Running in Menu Bar", action: #selector(toggleKeepResident), keyEquivalent: "")
+        keepResidentItem = residentItem
+        menu.addItem(residentItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit JMacEverything", action: #selector(quitApp), keyEquivalent: "q"))
         statusItem?.menu = menu
@@ -90,6 +126,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.title = isVisible ? "Hide JMacEverything" : "Show JMacEverything"
         }
         launchAtLoginItem?.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        keepResidentItem?.state = Self.keepResident ? .on : .off
         for (client, item) in mcpMenuItems {
             item.state = MCPConfigManager.isEnabled(for: client) ? .on : .off
         }
@@ -146,7 +183,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    @objc private func toggleKeepResident() {
+        Self.keepResident.toggle()
+    }
+
     @objc private func quitApp() {
+        userConfirmedQuit = true
         NSApp.terminate(nil)
     }
 

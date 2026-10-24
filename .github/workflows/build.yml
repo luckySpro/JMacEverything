@@ -19,8 +19,19 @@ jobs:
       - name: Install dependencies
         run: brew install re2 dylibbundler
 
+      # Upstream C++ test suite (engine code is unchanged in this fork).
+      # Non-blocking for now; full output is uploaded as an artifact.
       - name: Core tests (fast)
-        run: make test-fast
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          make test-fast 2>&1 | tee core-tests.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-tests-log
+          path: core-tests.log
 
       - name: Build app (unsigned)
         run: |

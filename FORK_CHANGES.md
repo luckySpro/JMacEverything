@@ -15,6 +15,15 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 
 ![Color cards (design mock)](docs/design/color-cards.png)
 
+## 1.8 — grep inside files (ideas from [fsearch](https://github.com/noahdunnagan/fsearch))
+- `grep:` / `infile:` / `content:` can appear **anywhere** and combine with any filter: `ext:swift grep:TODO`, `path:Projects grep:"open file"`
+- Shows **every matching line with its line number** (up to 20 per file), grouped by file; lines are read fresh from disk
+- **Smart case**: case-insensitive unless the pattern has a capital letter
+- **Regex inside files**: `inre:pattern` (needs a name filter such as `ext:` or `path:` to pick the files)
+- Files you filter by name are read directly even if their type isn't in the content index
+- ↩ / double-click **opens the file at that line** in Cursor, VS Code or Zed (otherwise the default app); right-click to copy `path:line` or the line
+- **In Content…** quick chip (⌃⌥C) and an "Add Common Text & Code Types" button in Content Settings
+
 ## 1.7 — Calmer start, tighter header, easier install
 - Empty query shows a start panel (recent searches you can re-run or remove, plus example queries) instead of a list of system cache files; the old "recently modified files" view is still available in the options menu
 - Header sits on the same row as the traffic lights, closer to the left edge, so more type tabs fit

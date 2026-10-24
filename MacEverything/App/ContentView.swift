@@ -85,7 +85,7 @@ extension EnvironmentValues {
 // MARK: - Quick query tokens (Everything syntax, one click / one shortcut)
 
 enum QuickQuery: String, CaseIterable, Identifiable {
-    case today, thisWeek, lastMonth, big, huge, filesOnly, foldersOnly, path, ext, exclude, or, regex
+    case today, thisWeek, lastMonth, big, huge, filesOnly, foldersOnly, path, ext, exclude, or, regex, grep
 
     var id: String { rawValue }
 
@@ -104,6 +104,7 @@ enum QuickQuery: String, CaseIterable, Identifiable {
         case .exclude: return "!"
         case .or: return "|"
         case .regex: return "regex:"
+        case .grep: return "grep:"
         }
     }
 
@@ -121,6 +122,7 @@ enum QuickQuery: String, CaseIterable, Identifiable {
         case .exclude: return "Exclude…"
         case .or: return "OR"
         case .regex: return "Regex…"
+        case .grep: return "In Content…"
         }
     }
 
@@ -147,11 +149,12 @@ enum QuickQuery: String, CaseIterable, Identifiable {
         case .exclude: return "x"
         case .or: return "o"
         case .regex: return "r"
+        case .grep: return "c"
         }
     }
 
     /// Chips shown under the search field.
-    static let bar: [QuickQuery] = [.today, .thisWeek, .lastMonth, .big, .huge, .path, .ext, .exclude, .or]
+    static let bar: [QuickQuery] = [.grep, .today, .thisWeek, .lastMonth, .big, .huge, .path, .ext, .exclude, .or]
 
     /// Returns the query with this token toggled (complete tokens) or appended (partial ones).
     func apply(to query: String) -> String {
@@ -545,7 +548,11 @@ struct ContentView: View {
         if viewModel.contentKeyword.isEmpty {
             EmptyStateView(symbol: "doc.text.magnifyingglass",
                            title: "Search inside files",
-                           subtitle: "Type a word after infile: to search file contents.")
+                           subtitle: "Type what to look for after grep: — combine with filters, e.g.  ext:swift grep:TODO   or   path:Projects inre:fn\\s+main")
+        } else if let notice = viewModel.contentNotice {
+            EmptyStateView(symbol: "exclamationmark.magnifyingglass",
+                           title: viewModel.contentIsRegex ? "Regex needs a filter" : "Can't search",
+                           subtitle: notice)
         } else if viewModel.contentResults.isEmpty && viewModel.scanComplete {
             if viewModel.isContentIndexing {
                 EmptyStateView(symbol: "doc.text.magnifyingglass",
@@ -554,24 +561,27 @@ struct ContentView: View {
                                showsProgress: true)
             } else {
                 EmptyStateView(symbol: "doc.text.magnifyingglass",
-                               title: "No content matches",
+                               title: "No matching lines",
                                subtitle: viewModel.contentIndexedCount == 0
-                                   ? "No files indexed yet. Choose extensions in Content Settings."
-                                   : "Nothing contains “\(viewModel.contentKeyword)”.")
+                                   ? "Only files you filter by name are read (e.g. ext:md grep:\(viewModel.contentKeyword)). Add file types in Content Settings to search everywhere."
+                                   : "Nothing contains “\(viewModel.contentKeyword)”. Add a filter such as ext:txt to also read files outside the content index.")
             }
         } else {
+            let list = viewModel.contentResults
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(viewModel.contentResults.enumerated()), id: \.element.id) { idx, item in
-                            ContentResultRow(item: item, keyword: viewModel.contentKeyword,
+                        ForEach(Array(list.enumerated()), id: \.element.id) { idx, item in
+                            ContentResultRow(item: item,
+                                             keyword: viewModel.contentIsRegex ? "" : viewModel.contentKeyword,
+                                             showsFileHeader: idx == 0 || list[idx - 1].filePath != item.filePath,
                                              isSelected: idx == selectedIndex,
                                              onSelect: { selectedIndex = idx })
                                 .id(item.id)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.bottom, 10)
                 }
                 .id(scrollViewID)
                 .accessibilityIdentifier("contentResultsList")
@@ -634,7 +644,8 @@ struct ContentView: View {
 
     private var matchSummary: String {
         if viewModel.isContentSearch {
-            return "\(viewModel.contentResults.count.formatted()) content matches"
+            let files = Set(viewModel.contentResults.map(\.filePath)).count
+            return "\(viewModel.contentResults.count.formatted()) lines in \(files.formatted()) files"
         }
         let total = viewModel.totalMatches.formatted()
         return items.count < viewModel.totalMatches
@@ -677,7 +688,11 @@ struct ContentView: View {
             guard let path = selectedPath else { return false }
             switch cmd {
             case .open:
-                if !viewModel.isContentSearch, items.indices.contains(selectedIndex) {
+                if viewModel.isContentSearch {
+                    let list = viewModel.contentResults
+                    let line = list.indices.contains(selectedIndex) ? list[selectedIndex].line : 0
+                    FileActions.openAt(path, line: line)
+                } else if items.indices.contains(selectedIndex) {
                     FileActions.open(items[selectedIndex])
                 } else {
                     FileActions.open(path)

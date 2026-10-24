@@ -12,12 +12,185 @@ struct FileItem: Identifiable {
 }
 
 struct ContentFileItem: Identifiable {
-    let id: String      // stable ID: filePath + ":" + matchOffset
+    let id: String      // stable ID: filePath + ":" + line
     let fileName: String
     let filePath: String
-    let snippet: String
+    let snippet: String // the matching line (trimmed)
     let matchOffset: UInt32
     let fileType: UInt8
+    var line: Int = 0   // 1-based line number, 0 if unknown
+}
+
+// MARK: - Content query (grep-style search inside files)
+
+/// Parsed form of a query that searches inside files, e.g.
+/// `ext:swift path:App grep:TODO`, `infile:"open file"`, `ext:rs inre:fn\s+\w+`.
+struct ContentQuery: Equatable {
+    var pattern: String
+    var isRegex: Bool
+    /// The rest of the query, used as a filename/path filter.
+    var nameQuery: String
+
+    static let literalPrefixes = ["infile:", "grep:", "content:"]
+    static let regexPrefixes = ["inre:", "grepre:"]
+
+    static func parse(_ text: String) -> ContentQuery? {
+        var tokens: [String] = []
+        var current = ""
+        var inQuote = false
+        for ch in text {
+            if ch == "\"" { inQuote.toggle(); current.append(ch); continue }
+            if ch == " " && !inQuote {
+                if !current.isEmpty { tokens.append(current); current = "" }
+            } else {
+                current.append(ch)
+            }
+        }
+        if !current.isEmpty { tokens.append(current) }
+
+        var pattern: String?
+        var regex = false
+        var rest: [String] = []
+        for t in tokens {
+            let lower = t.lowercased()
+            if pattern == nil, let p = (literalPrefixes + regexPrefixes).first(where: { lower.hasPrefix($0) }) {
+                var value = String(t.dropFirst(p.count))
+                if value.count >= 2, value.hasPrefix("\""), value.hasSuffix("\"") {
+                    value = String(value.dropFirst().dropLast())
+                } else if value.hasPrefix("\"") {
+                    value = String(value.dropFirst())
+                }
+                pattern = value
+                regex = regexPrefixes.contains(p)
+            } else {
+                rest.append(t)
+            }
+        }
+        guard let pattern else { return nil }
+        return ContentQuery(pattern: pattern, isRegex: regex, nameQuery: rest.joined(separator: " "))
+    }
+}
+
+/// Thread-safe cancellation flag for a running content scan.
+final class ContentCancelToken: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+    func cancel() { lock.lock(); cancelled = true; lock.unlock() }
+    var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
+}
+
+/// Reads candidate files and returns every matching line (like ripgrep, smart-case).
+enum ContentLineSearch {
+    static let maxFileBytes = 4 * 1024 * 1024
+    static let maxLinesPerFile = 20
+    static let maxTotalLines = 1000
+    static let maxNamedFilesToScan = 3000
+
+    enum Outcome {
+        case results([ContentFileItem], scannedFiles: Int)
+        case needsFilter        // regex without a name filter
+        case badRegex(String)
+    }
+
+    static func run(_ q: ContentQuery, nameQuery builtNameQuery: String,
+                    bridge: MacSearchBridge, isCancelled: @escaping () -> Bool) -> Outcome {
+        let caseSensitive = q.pattern.contains { $0.isUppercase }
+        var regex: NSRegularExpression?
+        if q.isRegex {
+            do {
+                regex = try NSRegularExpression(pattern: q.pattern,
+                                                options: caseSensitive ? [] : [.caseInsensitive])
+            } catch {
+                return .badRegex(error.localizedDescription)
+            }
+            if q.nameQuery.isEmpty { return .needsFilter }
+        }
+
+        // 1. Candidates from the trigram content index (literal patterns only)
+        var indexed: [String] = []
+        if !q.isRegex && q.pattern.count >= 3 {
+            var seen = Set<String>()
+            for r in bridge.queryContent(q.pattern, maxResults: 3000) where seen.insert(r.filePath).inserted {
+                indexed.append(r.filePath)
+            }
+        }
+
+        // 2. Narrow / extend with the name filter
+        var candidates: [String]
+        if !q.nameQuery.isEmpty {
+            let named = bridge.queryResults(builtNameQuery, maxResults: 20000, sessionId: 7)
+                .filter { $0.type == 1 }
+                .map { "\($0.path)/\($0.name)" }
+            let namedSet = Set(named)
+            let indexedSet = Set(indexed)
+            candidates = indexed.filter { namedSet.contains($0) }
+            // Files the user named are read directly even if their type isn't content-indexed.
+            candidates += named.lazy.filter { !indexedSet.contains($0) }.prefix(maxNamedFilesToScan)
+        } else {
+            candidates = indexed
+        }
+        if isCancelled() { return .results([], scannedFiles: 0) }
+
+        // 3. Read each file fresh and collect matching lines (parallel)
+        var perFile = [[ContentFileItem]](repeating: [], count: candidates.count)
+        let lock = NSLock()
+        var total = 0
+        DispatchQueue.concurrentPerform(iterations: candidates.count) { i in
+            lock.lock(); let full = total >= maxTotalLines; lock.unlock()
+            if full || isCancelled() { return }
+            let hits = scanFile(candidates[i], pattern: q.pattern, regex: regex, caseSensitive: caseSensitive)
+            if hits.isEmpty { return }
+            lock.lock(); perFile[i] = hits; total += hits.count; lock.unlock()
+        }
+        let items = Array(perFile.joined().prefix(maxTotalLines))
+        return .results(items, scannedFiles: candidates.count)
+    }
+
+    static func scanFile(_ path: String, pattern: String, regex: NSRegularExpression?,
+                         caseSensitive: Bool) -> [ContentFileItem] {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = attrs[.size] as? NSNumber, size.intValue <= maxFileBytes,
+              let data = FileManager.default.contents(atPath: path) else { return [] }
+        // Skip binaries: a NUL byte in the first 8 KB
+        if data.prefix(8192).contains(0) { return [] }
+        let text = String(decoding: data, as: UTF8.self)
+        let name = (path as NSString).lastPathComponent
+        var out: [ContentFileItem] = []
+        var lineNo = 0
+        text.enumerateLines { line, stop in
+            lineNo += 1
+            let matched: Bool
+            if let regex {
+                matched = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil
+            } else if caseSensitive {
+                matched = line.contains(pattern)
+            } else {
+                matched = line.range(of: pattern, options: .caseInsensitive) != nil
+            }
+            if matched {
+                out.append(ContentFileItem(
+                    id: "\(path):\(lineNo)", fileName: name, filePath: path,
+                    snippet: clip(line, around: pattern), matchOffset: UInt32(clamping: lineNo),
+                    fileType: 1, line: lineNo))
+                if out.count >= maxLinesPerFile { stop = true }
+            }
+        }
+        return out
+    }
+
+    /// Trim indentation and keep long lines readable around the match.
+    static func clip(_ line: String, around pattern: String) -> String {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count > 220 else { return trimmed }
+        if let r = trimmed.range(of: pattern, options: .caseInsensitive) {
+            let start = trimmed.index(r.lowerBound, offsetBy: -80, limitedBy: trimmed.startIndex) ?? trimmed.startIndex
+            let end = trimmed.index(start, offsetBy: 220, limitedBy: trimmed.endIndex) ?? trimmed.endIndex
+            let head = start > trimmed.startIndex ? "…" : ""
+            let tail = end < trimmed.endIndex ? "…" : ""
+            return head + String(trimmed[start..<end]) + tail
+        }
+        return String(trimmed.prefix(220)) + "…"
+    }
 }
 
 @MainActor
@@ -40,6 +213,10 @@ class SearchViewModel: ObservableObject {
     @Published var contentIndexedCount: UInt32 = 0
     @Published var isSyncing: Bool = false
     @Published var ghostSuggestion: String? = nil
+    /// Set when the current content query is a regex, needs a filter, or is invalid.
+    @Published var contentIsRegex: Bool = false
+    @Published var contentNotice: String? = nil
+    @Published var contentScannedFiles: Int = 0
 
     /// Structured highlight hints extracted from the C++ query AST.
     /// Replaces the old keyword-based approach with field-aware, mode-aware hints.
@@ -51,6 +228,7 @@ class SearchViewModel: ObservableObject {
 
     private let bridge = MacSearchBridge.shared()
     private let historyStore = SearchHistoryStore()
+    private var contentToken: ContentCancelToken?
     @Published private(set) var historyVersion = 0
 
     func recentSearches(limit: Int = 8) -> [String] { historyStore.recent(limit: limit) }
@@ -143,7 +321,7 @@ class SearchViewModel: ObservableObject {
                 self.contentIndexedCount = totalIndexed
                 // Auto-refresh content search results after indexing completes
                 if self.isContentSearch && !self.contentKeyword.isEmpty {
-                    self.performContentSearch(self.contentKeyword)
+                    self.performContentSearch(self.searchText)
                 }
             }
         }
@@ -200,6 +378,7 @@ class SearchViewModel: ObservableObject {
 
     func onSearchTextChanged() {
         searchTask?.cancel()
+        contentToken?.cancel()
         recentTask?.cancel()
         searchGeneration &+= 1
         isLoadingMore = false
@@ -233,17 +412,17 @@ class SearchViewModel: ObservableObject {
         }
         showingRecent = false
 
-        let lowerText = text.lowercased()
-        if lowerText.hasPrefix("infile:") {
+        if let cq = ContentQuery.parse(text) {
             isContentSearch = true
             displayItems = []
             cachedResults = []
             loadedCount = 0
 
-            let keyword = String(text.dropFirst(7))
-            contentKeyword = keyword // H-9: cache computed keyword
-            guard !keyword.isEmpty else {
+            contentKeyword = cq.pattern // H-9: cache computed keyword
+            contentIsRegex = cq.isRegex
+            guard !cq.pattern.isEmpty else {
                 contentResults = []
+                contentNotice = nil
                 totalMatches = 0
                 queryTimeMs = 0
                 return
@@ -253,7 +432,7 @@ class SearchViewModel: ObservableObject {
                 // 300ms debounce for content search (heavier)
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 guard !Task.isCancelled else { return }
-                performContentSearch(keyword)
+                performContentSearch(text)
             }
         } else {
             isContentSearch = false
@@ -308,31 +487,38 @@ class SearchViewModel: ObservableObject {
         }
     }
 
-    private func performContentSearch(_ keyword: String) {
+    private func performContentSearch(_ text: String) {
+        guard let cq = ContentQuery.parse(text) else { return }
         let bridge = self.bridge
         let gen = searchGeneration
+        let builtName = searchOptions.buildQuery(cq.nameQuery)
+        contentToken?.cancel()
+        let token = ContentCancelToken()
+        contentToken = token
         Task.detached { [weak self] in
             let start = CFAbsoluteTimeGetCurrent()
-            let results = bridge.queryContent(keyword, maxResults: 200)
-            let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
-
-            var items: [ContentFileItem] = []
-            items.reserveCapacity(results.count)
-            for r in results {
-                items.append(ContentFileItem(
-                    id: "\(r.filePath):\(r.matchOffset)",
-                    fileName: r.fileName,
-                    filePath: r.filePath,
-                    snippet: r.snippet,
-                    matchOffset: r.matchOffset,
-                    fileType: r.fileType
-                ))
+            let outcome = ContentLineSearch.run(cq, nameQuery: builtName, bridge: bridge) {
+                token.isCancelled   // set once a newer search starts
             }
+            let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
 
             await MainActor.run { [weak self] in
                 guard let self, self.searchGeneration == gen else { return }
-                self.contentResults = items
-                self.totalMatches = items.count
+                switch outcome {
+                case .results(let items, let scanned):
+                    self.contentResults = items
+                    self.contentScannedFiles = scanned
+                    self.contentNotice = nil
+                    self.totalMatches = items.count
+                case .needsFilter:
+                    self.contentResults = []
+                    self.totalMatches = 0
+                    self.contentNotice = "Regex search reads files directly — add a filter such as ext:swift or path:Projects to choose which files."
+                case .badRegex(let msg):
+                    self.contentResults = []
+                    self.totalMatches = 0
+                    self.contentNotice = "Invalid regular expression: \(msg)"
+                }
                 self.queryTimeMs = elapsed
             }
         }
@@ -445,7 +631,7 @@ class SearchViewModel: ObservableObject {
         if !searchText.isEmpty && !isContentSearch {
             performSearch(searchText)
         } else if isContentSearch && !contentKeyword.isEmpty {
-            performContentSearch(contentKeyword)
+            performContentSearch(searchText)
         } else if showingRecent {
             loadRecentFiles()
         }

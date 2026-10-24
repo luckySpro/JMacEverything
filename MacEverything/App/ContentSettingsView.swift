@@ -62,6 +62,8 @@ struct ContentSettingsView: View {
                         Button("Add") { addExtension() }
                             .disabled(newExtension.isEmpty)
                     }
+                    Button("Add Common Text & Code Types") { addRecommended() }
+                        .help("Plain text, Markdown, config files and source code")
                 }
             }
 
@@ -72,7 +74,7 @@ struct ContentSettingsView: View {
             }
         }
         .padding()
-        .frame(width: 400, height: 420)
+        .frame(width: 440, height: 470)
         .onAppear { loadSettings() }
     }
 
@@ -91,6 +93,22 @@ struct ContentSettingsView: View {
         guard !ext.isEmpty, !extensions.contains(ext) else { return }
         extensions.append(ext)
         newExtension = ""
+    }
+
+    static let recommended: [String] = [
+        "txt", "md", "markdown", "rst", "log", "csv", "tsv",
+        "json", "yaml", "yml", "toml", "ini", "cfg", "conf", "xml", "plist", "env",
+        "html", "htm", "css", "scss", "less", "vue", "svelte",
+        "js", "jsx", "ts", "tsx", "mjs", "cjs",
+        "swift", "m", "mm", "h", "hpp", "c", "cc", "cpp",
+        "py", "rb", "go", "rs", "java", "kt", "kts", "scala", "cs", "php", "lua", "dart",
+        "sh", "bash", "zsh", "fish", "ps1", "sql", "graphql", "proto", "gradle", "cmake", "tex",
+    ]
+
+    private func addRecommended() {
+        for ext in Self.recommended where !extensions.contains(ext) {
+            extensions.append(ext)
+        }
     }
 
     private func removeExtension(_ ext: String) {

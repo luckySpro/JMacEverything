@@ -1,93 +1,93 @@
 import SwiftUI
 import AppKit
 
+/// One matching line inside a file. When `showsFileHeader` is true the row starts a new file group.
 struct ContentResultRow: View {
     let item: ContentFileItem
     let keyword: String
+    var showsFileHeader: Bool = true
     var isSelected: Bool = false
     var onSelect: (() -> Void)? = nil
     @Environment(\.palette) private var palette
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            fileIcon(for: item.filePath)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 32, height: 32)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
+            if showsFileHeader {
+                HStack(spacing: 10) {
+                    Image(nsImage: FileIconCache.shared.icon(forPath: item.filePath))
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 20, height: 20)
                     Text(item.fileName)
-                        .font(.title3)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundColor(palette.ink)
                         .lineLimit(1)
-
                     Text(directoryPath(item.filePath))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(palette.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    Spacer()
                 }
-
-                highlightMatches(in: item.snippet, keyword: keyword, font: .system(size: 11.5, design: .monospaced), color: palette.muted, highlightColor: palette.accent)
-                    .lineLimit(2)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+                .padding(.horizontal, 8)
+                .contextMenu {
+                    FileContextMenu(path: item.filePath, isDirectory: false, isApp: false)
+                }
             }
 
-            Spacer()
-        }
-        .padding(.vertical, 5)
-        .padding(.horizontal, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? palette.surface
-                      : (isHovered ? palette.surface.opacity(0.55) : Color.clear))
-        )
-        .contentShape(Rectangle())
-        .onHover { hovering in
-            isHovered = hovering
-        }
-        .contextMenu {
-            FileContextMenu(path: item.filePath, isDirectory: false, isApp: false)
-        }
-        .onDrag {
-            return NSItemProvider(object: NSURL(fileURLWithPath: item.filePath))
-        }
-        .onTapGesture(count: 2) {
-            if NSEvent.modifierFlags.contains(.command) {
-                revealInFinder()
-            } else {
-                openFile()
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(item.line > 0 ? "\(item.line)" : "·")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundColor(isSelected ? palette.accent : palette.muted)
+                    .frame(width: 44, alignment: .trailing)
+                highlightMatches(in: item.snippet, keyword: keyword,
+                                 font: .system(size: 12, design: .monospaced),
+                                 color: palette.ink.opacity(0.85), highlightColor: palette.accent)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
             }
+            .padding(.vertical, 4)
+            .padding(.trailing, 10)
+            .background(
+                Rectangle().fill(isSelected ? palette.surface
+                                 : (isHovered ? palette.surface.opacity(0.55) : Color.clear))
+            )
+            .overlay(alignment: .leading) {
+                Rectangle().fill(isSelected ? palette.accent : Color.clear).frame(width: 3)
+            }
+            .contentShape(Rectangle())
+            .onHover { isHovered = $0 }
+            .contextMenu {
+                Button { FileActions.openAt(item.filePath, line: item.line) } label: {
+                    Label("Open at Line \(item.line)", systemImage: "text.cursor")
+                }
+                Button { FileActions.copy("\(item.filePath):\(item.line)") } label: {
+                    Label("Copy path:line", systemImage: "doc.on.doc")
+                }
+                Button { FileActions.copy(item.snippet) } label: {
+                    Label("Copy Line", systemImage: "text.quote")
+                }
+                Divider()
+                FileContextMenu(path: item.filePath, isDirectory: false, isApp: false)
+            }
+            .onDrag { NSItemProvider(object: NSURL(fileURLWithPath: item.filePath)) }
+            .onTapGesture(count: 2) {
+                if NSEvent.modifierFlags.contains(.command) {
+                    FileActions.reveal(item.filePath)
+                } else {
+                    FileActions.openAt(item.filePath, line: item.line)
+                }
+            }
+            .simultaneousGesture(TapGesture().onEnded { onSelect?() })
         }
-        .simultaneousGesture(TapGesture().onEnded { onSelect?() })
         .accessibilityIdentifier("contentResultRow")
     }
 
     private func directoryPath(_ fullPath: String) -> String {
-        if let range = fullPath.range(of: "/", options: .backwards) {
-            return String(fullPath[fullPath.startIndex..<range.lowerBound])
-        }
-        return fullPath
-    }
-
-    private func fileIcon(for path: String) -> Image {
-        Image(nsImage: FileIconCache.shared.icon(forPath: path))
-    }
-
-    private func openFile() {
-        if !NSWorkspace.shared.open(URL(fileURLWithPath: item.filePath)) {
-            NSSound.beep()
-        }
-    }
-
-    private func revealInFinder() {
-        NSWorkspace.shared.selectFile(item.filePath, inFileViewerRootedAtPath: "")
-    }
-
-    private func copyPath() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(item.filePath, forType: .string)
+        (fullPath as NSString).deletingLastPathComponent
     }
 }

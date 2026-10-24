@@ -74,6 +74,23 @@ enum FileActions {
         open(fullPath(item), isApp: item.type == 5 || item.name.hasSuffix(".app"))
     }
 
+    /// Opens a text file at a line in the first installed code editor
+    /// (Cursor, VS Code, Zed); otherwise the default app.
+    static func openAt(_ path: String, line: Int) {
+        guard line > 0 else { open(path); return }
+        let ws = NSWorkspace.shared
+        let encoded = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        let schemes: [(bundleID: String, url: String)] = [
+            ("com.todesktop.230313mzl4w4u92", "cursor://file\(encoded):\(line)"),
+            ("com.microsoft.VSCode", "vscode://file\(encoded):\(line)"),
+            ("dev.zed.Zed", "zed://file\(encoded):\(line)"),
+        ]
+        for s in schemes where ws.urlForApplication(withBundleIdentifier: s.bundleID) != nil {
+            if let url = URL(string: s.url), ws.open(url) { return }
+        }
+        open(path)
+    }
+
     static func reveal(_ path: String) {
         NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "")
     }

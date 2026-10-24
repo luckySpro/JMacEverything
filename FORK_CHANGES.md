@@ -20,6 +20,7 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 - Trigram / path / extension posting lists drop their growth slack after building (~85 MB+ on large disks).
 - Memory freed after the initial scan, index load and content indexing is handed back to macOS (`malloc_zone_pressure_relief`), instead of staying in the process footprint.
 - Footer shows the app's current memory (same number as Activity Monitor).
+- The upstream C++ test suite never compiled in CI (missing abseil include path). Fixed; all ~12,000 engine checks pass on macOS with the new map, and CI now blocks releases on test failures.
 
 ## 1.8 — grep inside files (ideas from [fsearch](https://github.com/noahdunnagan/fsearch))
 - `grep:` / `infile:` / `content:` can appear **anywhere** and combine with any filter: `ext:swift grep:TODO`, `path:Projects grep:"open file"`

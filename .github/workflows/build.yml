@@ -19,10 +19,8 @@ jobs:
       - name: Install dependencies
         run: brew install re2 dylibbundler
 
-      # Upstream C++ test suite (engine code is unchanged in this fork).
-      # Non-blocking for now; full output is uploaded as an artifact.
+      # Upstream C++ engine test suite (~12k checks). Blocking: a failure stops the release.
       - name: Core tests (fast)
-        continue-on-error: true
         run: |
           set +e
           make test-fast > core-tests.log 2>&1; status=$?

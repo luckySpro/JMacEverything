@@ -187,6 +187,7 @@ struct ContentView: View {
     @State private var selectedIndex: Int = 0
     @AppStorage("resultSort") private var sortRaw: String = ResultSort.relevance.rawValue
     @AppStorage("resultSortAscending") private var sortAscending: Bool = true
+    @AppStorage("showRecentFilesWhenEmpty") private var showRecentFiles: Bool = false
     @AppStorage("paletteID") private var paletteID: String = Palette.claude.id
     @FocusState private var isSearchFieldFocused: Bool
 
@@ -212,7 +213,8 @@ struct ContentView: View {
     }
 
     private var resultCount: Int {
-        viewModel.isContentSearch ? viewModel.contentResults.count : items.count
+        if viewModel.searchText.isEmpty && !showRecentFiles { return 0 }
+        return viewModel.isContentSearch ? viewModel.contentResults.count : items.count
     }
 
     var body: some View {
@@ -228,6 +230,7 @@ struct ContentView: View {
             Rectangle().fill(palette.rule).frame(height: 1)
             footer
         }
+        .ignoresSafeArea(edges: .top)   // header shares the row with the traffic lights
         .frame(minWidth: 720, minHeight: 460)
         .foregroundStyle(palette.ink)
         .background(palette.paper.ignoresSafeArea())
@@ -258,25 +261,24 @@ struct ContentView: View {
 
     private var headerBar: some View {
         HStack(spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(spacing: 7) {
                 Image(systemName: "scope")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(palette.accent)
                 Text("JMACEVERYTHING")
-                    .font(.system(size: 13, weight: .heavy))
-                    .tracking(2.2)
-                Rectangle().fill(palette.headerInk.opacity(0.25)).frame(width: 1, height: 16)
-                Text("Search")
-                    .font(.system(size: 12))
-                    .opacity(0.6)
+                    .font(.system(size: 12, weight: .heavy))
+                    .tracking(1.6)
+                    .fixedSize()
             }
-            .padding(.trailing, 22)
+            .frame(height: Self.titleRow)
+            .padding(.trailing, 14)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 2) {
+                HStack(spacing: 0) {
                     ForEach(Array(TypeFilter.allCases.enumerated()), id: \.element) { idx, f in
                         HeaderTab(number: idx + 1, title: f.title,
-                                  isOn: searchOptions.typeFilter == f) {
+                                  isOn: searchOptions.typeFilter == f,
+                                  rowHeight: Self.titleRow, height: Self.headerHeight) {
                             searchOptions.typeFilter = f
                             isSearchFieldFocused = true
                         }
@@ -284,16 +286,23 @@ struct ContentView: View {
                 }
             }
 
-            Spacer(minLength: 8)
-            paletteMenu
-            optionsMenu
+            Spacer(minLength: 6)
+            HStack(spacing: 0) {
+                paletteMenu
+                optionsMenu
+            }
+            .frame(height: Self.titleRow)
         }
+        .frame(height: Self.headerHeight, alignment: .top)
         .foregroundStyle(palette.headerInk)
-        .padding(.leading, 84)      // clear the traffic lights
-        .padding(.trailing, 14)
-        .frame(height: 50)
-        .background(palette.header.ignoresSafeArea(edges: .top))
+        .padding(.leading, 76)      // just past the traffic lights
+        .padding(.trailing, 10)
+        .background(palette.header)
     }
+
+    /// Height of the window's title-bar row (traffic lights are centred in it).
+    private static let titleRow: CGFloat = 30
+    private static let headerHeight: CGFloat = 40
 
     private var paletteMenu: some View {
         Menu {
@@ -373,6 +382,8 @@ struct ContentView: View {
             Toggle("Whole Word", isOn: $searchOptions.isWholeWord)
             Toggle("Match Whole Filename", isOn: $searchOptions.isMatchFilename)
             Divider()
+            Toggle("Show Recently Modified Files When Empty", isOn: $showRecentFiles)
+            Divider()
             Button("Search Syntax Help") { SearchSyntaxHelpWindowController.shared.showWindow() }
             Button("Content Settings…") { ContentSettingsWindowController.shared.showWindow() }
             Button("Shortcut Settings…") { ShortcutSettingsWindowController.shared.showWindow() }
@@ -428,7 +439,7 @@ struct ContentView: View {
 
     private var metaBar: some View {
         HStack(spacing: 8) {
-            Text(viewModel.showingRecent ? "RECENT" : (viewModel.isContentSearch ? "CONTENT" : "RESULTS"))
+            Text(viewModel.searchText.isEmpty ? (showRecentFiles ? "RECENT" : "READY") : (viewModel.isContentSearch ? "CONTENT" : "RESULTS"))
                 .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                 .tracking(1.2)
                 .foregroundStyle(palette.accent)
@@ -477,10 +488,15 @@ struct ContentView: View {
                                ? "Try fewer words, wildcards like *.pdf, or press ⇧⌘/ for syntax help."
                                : "Nothing matched in \(searchOptions.typeFilter.title). Try the All filter.")
                 .accessibilityIdentifier("noResultsLabel")
-        } else if items.isEmpty && viewModel.searchText.isEmpty {
-            EmptyStateView(symbol: "sparkle.magnifyingglass",
-                           title: "Find anything on your Mac",
-                           subtitle: "Try  *.pdf   ext:swift todo   dm:today   size:>100mb   infile:password")
+        } else if viewModel.searchText.isEmpty && (!showRecentFiles || items.isEmpty) {
+            StartPanel(recent: viewModel.recentSearches(),
+                       version: viewModel.historyVersion,
+                       onPick: { q in
+                           viewModel.searchText = q
+                           isSearchFieldFocused = true
+                       },
+                       onRemove: { viewModel.removeRecentSearch($0) },
+                       onClear: { viewModel.clearRecentSearches() })
         } else {
             fileResults
         }
@@ -691,24 +707,28 @@ private struct HeaderTab: View {
     let number: Int
     let title: String
     let isOn: Bool
+    var rowHeight: CGFloat = 30
+    var height: CGFloat = 40
     let action: () -> Void
     @Environment(\.palette) private var palette
     @State private var hovered = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Text(String(format: "%02d", number))
-                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(isOn ? palette.accent : palette.headerInk.opacity(0.45))
                 Text(title)
-                    .font(.system(size: 13, weight: isOn ? .semibold : .regular))
+                    .font(.system(size: 12.5, weight: isOn ? .semibold : .regular))
                     .foregroundStyle(palette.headerInk.opacity(isOn ? 1 : (hovered ? 0.85 : 0.65)))
+                    .fixedSize()
             }
-            .padding(.horizontal, 11)
-            .frame(height: 50)
+            .frame(height: rowHeight)
+            .padding(.horizontal, 9)
+            .frame(height: height, alignment: .top)
             .overlay(alignment: .bottom) {
-                Rectangle().fill(isOn ? palette.accent : .clear).frame(height: 3)
+                Rectangle().fill(isOn ? palette.accent : .clear).frame(height: 2.5)
             }
             .contentShape(Rectangle())
         }
@@ -724,6 +744,147 @@ private struct DoubleRule: View {
         VStack(spacing: 2) {
             Rectangle().fill(color).frame(height: 1.5)
             Rectangle().fill(color).frame(height: 1)
+        }
+    }
+}
+
+/// Shown when the query is empty: recent searches + example queries, instead of a noisy file list.
+private struct StartPanel: View {
+    let recent: [String]
+    let version: Int
+    let onPick: (String) -> Void
+    let onRemove: (String) -> Void
+    let onClear: () -> Void
+    @Environment(\.palette) private var palette
+
+    private let examples: [(String, String)] = [
+        ("*.pdf", "All PDFs"),
+        ("dm:today", "Changed today"),
+        ("size:>1gb", "Huge files"),
+        ("ext:swift todo", "Swift files named todo"),
+        ("folder: project", "Folders named project"),
+        ("~/Downloads *.dmg", "Installers in Downloads"),
+        ("infile:password", "Text inside files"),
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Find anything on your Mac")
+                        .font(.system(size: 24, weight: .heavy))
+                    Text("Start typing — results appear as you type. Use the tabs above to narrow by kind.")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(palette.muted)
+                }
+
+                if !recent.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            label("RECENT SEARCHES")
+                            Spacer()
+                            Button("Clear", action: onClear)
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(palette.accent)
+                        }
+                        FlowRow(items: recent) { q in
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock.arrow.circlepath").font(.system(size: 10))
+                                Text(q).font(.system(size: 12.5, design: .monospaced)).lineLimit(1)
+                                Button { onRemove(q) } label: {
+                                    Image(systemName: "xmark").font(.system(size: 8.5, weight: .bold))
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(palette.muted)
+                            }
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(RoundedRectangle(cornerRadius: 4).fill(palette.surface))
+                            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(palette.rule))
+                            .contentShape(Rectangle())
+                            .onTapGesture { onPick(q) }
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 0) {
+                    label("TRY").padding(.bottom, 8)
+                    ForEach(examples, id: \.0) { ex in
+                        Button { onPick(ex.0) } label: {
+                            HStack {
+                                Text(ex.0)
+                                    .font(.system(size: 12.5, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(palette.accent)
+                                    .frame(width: 190, alignment: .leading)
+                                Text(ex.1)
+                                    .font(.system(size: 12.5))
+                                    .foregroundStyle(palette.muted)
+                                Spacer()
+                                Image(systemName: "arrow.up.left")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(palette.muted.opacity(0.6))
+                            }
+                            .padding(.vertical, 7)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .overlay(alignment: .bottom) {
+                            Rectangle().fill(palette.rule.opacity(0.7)).frame(height: 1)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: 620, alignment: .leading)
+            .padding(.horizontal, 28)
+            .padding(.vertical, 22)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .id(version)
+    }
+
+    private func label(_ t: String) -> some View {
+        Text(t)
+            .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+            .tracking(1.2)
+            .foregroundStyle(palette.muted)
+    }
+}
+
+/// Minimal wrapping row for chips.
+private struct FlowRow<Content: View>: View {
+    let items: [String]
+    let content: (String) -> Content
+
+    var body: some View {
+        FlowLayout(spacing: 6) {
+            ForEach(items, id: \.self) { content($0) }
+        }
+    }
+}
+
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 600
+        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > 0 && x + s.width > width { x = 0; y += rowH + spacing; rowH = 0 }
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
+        }
+        return CGSize(width: width, height: y + rowH)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > bounds.minX && x + s.width > bounds.maxX { x = bounds.minX; y += rowH + spacing; rowH = 0 }
+            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
         }
     }
 }

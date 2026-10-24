@@ -44,6 +44,21 @@ final class SearchHistoryStore {
         save()
     }
 
+    /// Most recently used queries, newest first.
+    func recent(limit: Int) -> [String] {
+        entries.sorted { $0.lastUsed > $1.lastUsed }.prefix(limit).map(\.query)
+    }
+
+    func remove(_ query: String) {
+        entries.removeAll { $0.query == query }
+        save()
+    }
+
+    func clear() {
+        entries.removeAll()
+        save()
+    }
+
     func bestMatch(for prefix: String) -> String? {
         guard !prefix.isEmpty else { return nil }
         let lowerPrefix = prefix.lowercased()

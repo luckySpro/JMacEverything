@@ -15,6 +15,11 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 
 ![Color cards (design mock)](docs/design/color-cards.png)
 
+## 1.7 — Calmer start, tighter header, easier install
+- Empty query shows a start panel (recent searches you can re-run or remove, plus example queries) instead of a list of system cache files; the old "recently modified files" view is still available in the options menu
+- Header sits on the same row as the traffic lights, closer to the left edge, so more type tabs fit
+- DMG contains an **Applications** shortcut: open it and drag JMacEverything across
+
 ## 1.6 — Own name and icon
 - The app is now **JMacEverything.app** (window title, menu-bar items, DMG volume and files)
 - New icon: terracotta magnifier with a cream "J" on warm ink, matching the Claude Paper palette

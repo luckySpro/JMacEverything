@@ -51,6 +51,11 @@ class SearchViewModel: ObservableObject {
 
     private let bridge = MacSearchBridge.shared()
     private let historyStore = SearchHistoryStore()
+    @Published private(set) var historyVersion = 0
+
+    func recentSearches(limit: Int = 8) -> [String] { historyStore.recent(limit: limit) }
+    func removeRecentSearch(_ q: String) { historyStore.remove(q); historyVersion += 1 }
+    func clearRecentSearches() { historyStore.clear(); historyVersion += 1 }
     private let searchOptions = SearchOptions.shared
     private var searchTask: Task<Void, Never>?
     private var recentTask: Task<Void, Never>?

@@ -62,7 +62,11 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           mkdir -p dist
           ditto -c -k --keepParent build/Release/JMacEverything.app "dist/JMacEverything-$VERSION-arm64.zip"
-          hdiutil create -volname JMacEverything -srcfolder build/Release/JMacEverything.app \
+          # DMG with an Applications shortcut: open it and drag the app across
+          STAGE=$(mktemp -d)
+          cp -R build/Release/JMacEverything.app "$STAGE/"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname JMacEverything -srcfolder "$STAGE" \
             -ov -format UDZO "dist/JMacEverything-$VERSION-arm64.dmg"
           (cd dist && shasum -a 256 * > SHA256SUMS.txt)
 

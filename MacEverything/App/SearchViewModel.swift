@@ -553,11 +553,11 @@ class SearchViewModel: ObservableObject {
                 case .needsFilter:
                     self.contentResults = []
                     self.totalMatches = 0
-                    self.contentNotice = "Regex search reads files directly — add a filter such as ext:swift or path:Projects to choose which files."
+                    self.contentNotice = L("Regex search reads files directly — add a filter such as ext:swift or path:Projects to choose which files.")
                 case .badRegex(let msg):
                     self.contentResults = []
                     self.totalMatches = 0
-                    self.contentNotice = "Invalid regular expression: \(msg)"
+                    self.contentNotice = LF("Invalid regular expression: %@", msg)
                 }
                 self.queryTimeMs = elapsed
             }

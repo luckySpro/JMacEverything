@@ -63,13 +63,13 @@ struct ContentResultRow: View {
             .onHover { isHovered = $0 }
             .contextMenu {
                 Button { FileActions.openAt(item.filePath, line: item.line) } label: {
-                    Label("Open at Line \(item.line)", systemImage: "text.cursor")
+                    Label(LF("Open at Line %@", "\(item.line)"), systemImage: "text.cursor")
                 }
                 Button { FileActions.copy("\(item.filePath):\(item.line)") } label: {
-                    Label("Copy path:line", systemImage: "doc.on.doc")
+                    Label(L("Copy path:line"), systemImage: "doc.on.doc")
                 }
                 Button { FileActions.copy(item.snippet) } label: {
-                    Label("Copy Line", systemImage: "text.quote")
+                    Label(L("Copy Line"), systemImage: "text.quote")
                 }
                 Divider()
                 FileContextMenu(path: item.filePath, isDirectory: false, isApp: false)

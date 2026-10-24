@@ -9,25 +9,25 @@ struct ShortcutSettingsView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Text("Global Hotkey Settings")
+            Text(L("Global Hotkey Settings"))
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Click the button below and press your desired key combination to set the global hotkey for showing/hiding MacEverything.")
+            Text(L("Click the button below and press your desired key combination to set the global hotkey for showing/hiding MacEverything."))
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
 
             VStack(spacing: 12) {
-                Text("Current Shortcut")
+                Text(L("Current Shortcut"))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
                 Button(action: {
                     isRecording.toggle()
                 }) {
-                    Text(isRecording ? "Press a key combination..." : currentShortcut)
+                    Text(isRecording ? L("Press a key combination...") : currentShortcut)
                         .font(.title3)
                         .fontWeight(.medium)
                         .foregroundColor(isRecording ? .accentColor : .primary)
@@ -61,14 +61,14 @@ struct ShortcutSettingsView: View {
             }
 
             HStack(spacing: 16) {
-                Button("Reset to Default") {
+                Button(L("Reset to Default")) {
                     keyCode = UInt32(kVK_Space)
                     modifiers = UInt32(optionKey)
                     currentShortcut = describeShortcut(keyCode: keyCode, modifiers: modifiers)
                     saveAndApply()
                 }
 
-                Button("Close") {
+                Button(L("Close")) {
                     NSApp.keyWindow?.close()
                 }
                 .keyboardShortcut(.cancelAction)

@@ -8,11 +8,11 @@ enum ResultSort: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .relevance: return "Relevance"
-        case .name: return "Name"
-        case .dateModified: return "Date Modified"
-        case .size: return "Size"
-        case .kind: return "Kind"
+        case .relevance: return L("Relevance")
+        case .name: return L("Name")
+        case .dateModified: return L("Date Modified")
+        case .size: return L("Size")
+        case .kind: return L("Kind")
         }
     }
 }
@@ -110,19 +110,19 @@ enum QuickQuery: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .today: return "Today"
-        case .thisWeek: return "This Week"
-        case .lastMonth: return "Last Month"
-        case .big: return "> 100 MB"
-        case .huge: return "> 1 GB"
-        case .filesOnly: return "Files Only"
-        case .foldersOnly: return "Folders Only"
-        case .path: return "In Path…"
-        case .ext: return "Extension…"
-        case .exclude: return "Exclude…"
-        case .or: return "OR"
-        case .regex: return "Regex…"
-        case .grep: return "In Content…"
+        case .today: return L("Today")
+        case .thisWeek: return L("This Week")
+        case .lastMonth: return L("Last Month")
+        case .big: return L("> 100 MB")
+        case .huge: return L("> 1 GB")
+        case .filesOnly: return L("Files Only")
+        case .foldersOnly: return L("Folders Only")
+        case .path: return L("In Path…")
+        case .ext: return L("Extension…")
+        case .exclude: return L("Exclude…")
+        case .or: return L("OR")
+        case .regex: return L("Regex…")
+        case .grep: return L("In Content…")
         }
     }
 
@@ -186,6 +186,7 @@ extension Notification.Name {
 struct ContentView: View {
     @StateObject private var viewModel = SearchViewModel()
     @ObservedObject private var searchOptions = SearchOptions.shared
+    @ObservedObject private var l10n = L10n.shared
     @State private var scrollViewID = 0
     @State private var selectedIndex: Int = 0
     @AppStorage("resultSort") private var sortRaw: String = ResultSort.relevance.rawValue
@@ -240,6 +241,7 @@ struct ContentView: View {
         .tint(palette.accent)
         .environment(\.palette, palette)
         .preferredColorScheme(palette.isDark ? .dark : .light)
+        .id(l10n.resolved)   // re-render every string when the language changes
         .onChange(of: viewModel.searchText) { selectedIndex = 0 }
         .onChange(of: searchOptions.typeFilter) { selectedIndex = 0 }
         .onReceive(NotificationCenter.default.publisher(for: .quickQuery)) { note in
@@ -309,8 +311,8 @@ struct ContentView: View {
 
     private var paletteMenu: some View {
         Menu {
-            Picker("Color Card", selection: $paletteID) {
-                ForEach(Palette.all) { p in Text(p.name).tag(p.id) }
+            Picker(L("Color Card"), selection: $paletteID) {
+                ForEach(Palette.all) { p in Text(L(p.name)).tag(p.id) }
             }
             .pickerStyle(.inline)
         } label: {
@@ -322,7 +324,7 @@ struct ContentView: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .padding(.horizontal, 8)
-        .help("Color card")
+        .help(L("Color card"))
     }
 
     // MARK: Search field
@@ -335,7 +337,7 @@ struct ContentView: View {
                 .frame(width: 22)
             HighlightedSearchField(
                 text: $viewModel.searchText,
-                placeholder: "Search files and folders…",
+                placeholder: L("Search files and folders…"),
                 ghostSuggestion: viewModel.ghostSuggestion,
                 isFocused: $isSearchFieldFocused,
                 onTab: {
@@ -361,7 +363,7 @@ struct ContentView: View {
                         .foregroundStyle(palette.muted.opacity(0.7))
                 }
                 .buttonStyle(.plain)
-                .help("Clear (Esc)")
+                .help(L("Clear (Esc)"))
                 .accessibilityIdentifier("clearButton")
             }
         }
@@ -380,16 +382,20 @@ struct ContentView: View {
 
     private var optionsMenu: some View {
         Menu {
-            Toggle("Regex", isOn: $searchOptions.isRegex)
-            Toggle("Case Sensitive", isOn: $searchOptions.isCaseSensitive)
-            Toggle("Whole Word", isOn: $searchOptions.isWholeWord)
-            Toggle("Match Whole Filename", isOn: $searchOptions.isMatchFilename)
+            Toggle(L("Regex"), isOn: $searchOptions.isRegex)
+            Toggle(L("Case Sensitive"), isOn: $searchOptions.isCaseSensitive)
+            Toggle(L("Whole Word"), isOn: $searchOptions.isWholeWord)
+            Toggle(L("Match Whole Filename"), isOn: $searchOptions.isMatchFilename)
             Divider()
-            Toggle("Show Recently Modified Files When Empty", isOn: $showRecentFiles)
+            Toggle(L("Show Recently Modified Files When Empty"), isOn: $showRecentFiles)
             Divider()
-            Button("Search Syntax Help") { SearchSyntaxHelpWindowController.shared.showWindow() }
-            Button("Content Settings…") { ContentSettingsWindowController.shared.showWindow() }
-            Button("Shortcut Settings…") { ShortcutSettingsWindowController.shared.showWindow() }
+            Picker(L("Language"), selection: $l10n.language) {
+                ForEach(AppLanguage.allCases) { Text($0.displayName).tag($0) }
+            }
+            Divider()
+            Button(L("Search Syntax Help")) { SearchSyntaxHelpWindowController.shared.showWindow() }
+            Button(L("Content Settings…")) { ContentSettingsWindowController.shared.showWindow() }
+            Button(L("Shortcut Settings…")) { ShortcutSettingsWindowController.shared.showWindow() }
         } label: {
             Image(systemName: "slider.horizontal.3")
                 .font(.system(size: 14))
@@ -398,7 +404,7 @@ struct ContentView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Search options")
+        .help(L("Search options"))
     }
 
     // MARK: Quick query chips
@@ -406,7 +412,7 @@ struct ContentView: View {
     private var quickBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                Text("QUICK")
+                Text(L("QUICK"))
                     .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                     .tracking(1.2)
                     .foregroundStyle(palette.muted)
@@ -419,7 +425,7 @@ struct ContentView: View {
                 Button {
                     SearchSyntaxHelpWindowController.shared.showWindow()
                 } label: {
-                    Text("Syntax ⇧⌘/")
+                    Text(L("Syntax ⇧⌘/"))
                         .font(.system(size: 11.5))
                         .foregroundStyle(palette.accent)
                         .underline()
@@ -442,7 +448,7 @@ struct ContentView: View {
 
     private var metaBar: some View {
         HStack(spacing: 8) {
-            Text(viewModel.searchText.isEmpty ? (showRecentFiles ? "RECENT" : "READY") : (viewModel.isContentSearch ? "CONTENT" : "RESULTS"))
+            Text(L(viewModel.searchText.isEmpty ? (showRecentFiles ? "RECENT" : "READY") : (viewModel.isContentSearch ? "CONTENT" : "RESULTS")))
                 .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                 .tracking(1.2)
                 .foregroundStyle(palette.accent)
@@ -451,12 +457,12 @@ struct ContentView: View {
                 .foregroundStyle(palette.muted)
             Spacer(minLength: 8)
             Menu {
-                Picker("Sort By", selection: $sortRaw) {
+                Picker(L("Sort By"), selection: $sortRaw) {
                     ForEach(ResultSort.allCases) { Text($0.title).tag($0.rawValue) }
                 }
                 .pickerStyle(.inline)
                 Divider()
-                Toggle("Ascending", isOn: $sortAscending).disabled(sort == .relevance)
+                Toggle(L("Ascending"), isOn: $sortAscending).disabled(sort == .relevance)
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.up.arrow.down")
@@ -467,7 +473,7 @@ struct ContentView: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .help("Sort loaded results")
+            .help(L("Sort loaded results"))
         }
         .padding(.horizontal, 26)
         .padding(.bottom, 10)
@@ -479,17 +485,17 @@ struct ContentView: View {
     private var resultsArea: some View {
         if viewModel.isScanning {
             EmptyStateView(symbol: "internaldrive",
-                           title: "Building the index…",
-                           subtitle: "\(viewModel.scannedCount.formatted()) items scanned so far",
+                           title: L("Building the index…"),
+                           subtitle: LF("%@ items scanned so far", viewModel.scannedCount.formatted()),
                            showsProgress: true)
         } else if viewModel.isContentSearch {
             contentResults
         } else if items.isEmpty && !viewModel.searchText.isEmpty && viewModel.scanComplete {
             EmptyStateView(symbol: "magnifyingglass",
-                           title: "No results",
+                           title: L("No results"),
                            subtitle: searchOptions.typeFilter == .all
-                               ? "Try fewer words, wildcards like *.pdf, or press ⇧⌘/ for syntax help."
-                               : "Nothing matched in \(searchOptions.typeFilter.title). Try the All filter.")
+                               ? L("Try fewer words, wildcards like *.pdf, or press ⇧⌘/ for syntax help.")
+                               : LF("Nothing matched in %@. Try the All filter.", searchOptions.typeFilter.title))
                 .accessibilityIdentifier("noResultsLabel")
         } else if viewModel.searchText.isEmpty && (!showRecentFiles || items.isEmpty) {
             StartPanel(recent: viewModel.recentSearches(),
@@ -510,7 +516,7 @@ struct ContentView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     if viewModel.showingRecent && !items.isEmpty {
-                        SectionHeader(symbol: "clock", title: "Recently Modified")
+                        SectionHeader(symbol: "clock", title: L("Recently Modified"))
                     }
                     ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                         ResultRow(item: item, hints: viewModel.highlightHints,
@@ -521,7 +527,7 @@ struct ContentView: View {
                     if viewModel.hasMoreResults {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
-                            Text("Loading more…").font(.callout).foregroundStyle(.secondary)
+                            Text(L("Loading more…")).font(.callout).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -547,8 +553,8 @@ struct ContentView: View {
     private var contentResults: some View {
         if viewModel.contentKeyword.isEmpty {
             EmptyStateView(symbol: "doc.text.magnifyingglass",
-                           title: "Search inside files",
-                           subtitle: "Type what to look for after grep: — combine with filters, e.g.  ext:swift grep:TODO   or   path:Projects inre:fn\\s+main")
+                           title: L("Search inside files"),
+                           subtitle: L("Type what to look for after grep: — combine with filters, e.g.  ext:swift grep:TODO   or   path:Projects inre:fn\\s+main"))
         } else if let notice = viewModel.contentNotice {
             EmptyStateView(symbol: "exclamationmark.magnifyingglass",
                            title: viewModel.contentIsRegex ? "Regex needs a filter" : "Can't search",
@@ -556,15 +562,15 @@ struct ContentView: View {
         } else if viewModel.contentResults.isEmpty && viewModel.scanComplete {
             if viewModel.isContentIndexing {
                 EmptyStateView(symbol: "doc.text.magnifyingglass",
-                               title: "Content index is building…",
-                               subtitle: viewModel.contentIndexProgress.map { "Indexed \($0.indexed) of \($0.total) files" } ?? "",
+                               title: L("Content index is building…"),
+                               subtitle: viewModel.contentIndexProgress.map { LF("Indexed %@ of %@ files", "\($0.indexed)", "\($0.total)") } ?? "",
                                showsProgress: true)
             } else {
                 EmptyStateView(symbol: "doc.text.magnifyingglass",
-                               title: "No matching lines",
+                               title: L("No matching lines"),
                                subtitle: viewModel.contentIndexedCount == 0
-                                   ? "Only files you filter by name are read (e.g. ext:md grep:\(viewModel.contentKeyword)). Add file types in Content Settings to search everywhere."
-                                   : "Nothing contains “\(viewModel.contentKeyword)”. Add a filter such as ext:txt to also read files outside the content index.")
+                                   ? LF("Only files you filter by name are read (e.g. ext:md grep:%@). Add file types in Content Settings to search everywhere.", viewModel.contentKeyword)
+                                   : LF("Nothing contains “%@”. Add a filter such as ext:txt to also read files outside the content index.", viewModel.contentKeyword))
             }
         } else {
             let list = viewModel.contentResults
@@ -598,19 +604,19 @@ struct ContentView: View {
 
     private var footer: some View {
         HStack(spacing: 14) {
-            KeyHint(keys: "↑↓", label: "Select")
-            KeyHint(keys: "↩", label: "Open")
-            KeyHint(keys: "⌘↩", label: "Reveal")
-            KeyHint(keys: "⌘Y", label: "Quick Look")
-            KeyHint(keys: "⌥⌘C", label: "Copy Path")
+            KeyHint(keys: "↑↓", label: L("Select"))
+            KeyHint(keys: "↩", label: L("Open"))
+            KeyHint(keys: "⌘↩", label: L("Reveal"))
+            KeyHint(keys: "⌘Y", label: L("Quick Look"))
+            KeyHint(keys: "⌥⌘C", label: L("Copy Path"))
             Spacer()
             if viewModel.memoryFootprint > 0 {
-                Text("RAM \(ByteCountFormatter.string(fromByteCount: Int64(viewModel.memoryFootprint), countStyle: .memory))")
+                Text(LF("RAM %@", ByteCountFormatter.string(fromByteCount: Int64(viewModel.memoryFootprint), countStyle: .memory)))
                     .monospacedDigit()
-                    .help("Memory used by JMacEverything (same as Activity Monitor)")
+                    .help(L("Memory used by JMacEverything (same as Activity Monitor)"))
                 Text("·")
             }
-            Text("⌘1–9 filters · Esc hide")
+            Text(L("⌘1–9 filters · Esc hide"))
         }
         .font(.system(size: 11))
         .foregroundStyle(palette.muted)
@@ -624,20 +630,20 @@ struct ContentView: View {
     private var statusIndicator: some View {
         if viewModel.isScanning {
             ProgressView().controlSize(.mini)
-            Text("Indexing…")
+            Text(L("Indexing…"))
         } else if viewModel.scanComplete {
             if viewModel.isSyncing {
                 ProgressView().controlSize(.mini)
-                Text("Syncing").foregroundStyle(.orange)
+                Text(L("Syncing")).foregroundStyle(.orange)
             } else if viewModel.isMonitoring {
                 Circle().fill(.green).frame(width: 6, height: 6)
-                    .help("Watching the file system for changes")
+                    .help(L("Watching the file system for changes"))
             }
-            Text("\(Int(viewModel.totalRecords).formatted()) indexed")
+            Text(LF("%@ indexed", Int(viewModel.totalRecords).formatted()))
                 .accessibilityIdentifier("indexedCount")
             if viewModel.isContentIndexing, let p = viewModel.contentIndexProgress {
                 Text("·")
-                Text("Content \(p.indexed)/\(p.total)").foregroundStyle(.orange)
+                Text(LF("Content %@/%@", "\(p.indexed)", "\(p.total)")).foregroundStyle(.orange)
             }
             if viewModel.totalMatches > 0 {
                 Text("·")
@@ -651,12 +657,12 @@ struct ContentView: View {
     private var matchSummary: String {
         if viewModel.isContentSearch {
             let files = Set(viewModel.contentResults.map(\.filePath)).count
-            return "\(viewModel.contentResults.count.formatted()) lines in \(files.formatted()) files"
+            return LF("%@ lines in %@ files", viewModel.contentResults.count.formatted(), files.formatted())
         }
         let total = viewModel.totalMatches.formatted()
         return items.count < viewModel.totalMatches
-            ? "\(items.count.formatted()) of \(total) matches"
-            : "\(total) matches"
+            ? LF("%@ of %@ matches", items.count.formatted(), total)
+            : LF("%@ matches", total)
     }
 
     // MARK: Keyboard
@@ -785,22 +791,22 @@ private struct StartPanel: View {
     }
 
     private let examples: [Example] = [
-        Example(query: "*.pdf", note: "All PDFs"),
-        Example(query: "dm:today", note: "Changed today"),
-        Example(query: "size:>1gb", note: "Huge files"),
-        Example(query: "ext:swift todo", note: "Swift files named todo"),
-        Example(query: "folder: project", note: "Folders named project"),
-        Example(query: "~/Downloads *.dmg", note: "Installers in Downloads"),
-        Example(query: "infile:password", note: "Text inside files"),
+        Example(query: "*.pdf", note: L("All PDFs")),
+        Example(query: "dm:today", note: L("Changed today")),
+        Example(query: "size:>1gb", note: L("Huge files")),
+        Example(query: "ext:swift todo", note: L("Swift files named todo")),
+        Example(query: "folder: project", note: L("Folders named project")),
+        Example(query: "~/Downloads *.dmg", note: L("Installers in Downloads")),
+        Example(query: "infile:password", note: L("Text inside files")),
     ]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Find anything on your Mac")
+                    Text(L("Find anything on your Mac"))
                         .font(.system(size: 24, weight: .heavy))
-                    Text("Start typing — results appear as you type. Use the tabs above to narrow by kind.")
+                    Text(L("Start typing — results appear as you type. Use the tabs above to narrow by kind."))
                         .font(.system(size: 12.5))
                         .foregroundStyle(palette.muted)
                 }
@@ -810,7 +816,7 @@ private struct StartPanel: View {
                         HStack {
                             label("RECENT SEARCHES")
                             Spacer()
-                            Button("Clear", action: onClear)
+                            Button(L("Clear"), action: onClear)
                                 .buttonStyle(.plain)
                                 .font(.system(size: 11.5))
                                 .foregroundStyle(palette.accent)

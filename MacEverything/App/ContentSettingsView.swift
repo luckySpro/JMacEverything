@@ -13,14 +13,14 @@ struct ContentSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Content Indexing") {
+            Section(L("Content Indexing")) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Indexed Files: \(indexedCount)")
+                    Text(LF("Indexed Files: %@", "\(indexedCount)"))
                         .font(.headline)
 
                     Divider()
 
-                    Text("Max File Size")
+                    Text(L("Max File Size"))
                         .font(.subheadline)
                     HStack {
                         Slider(value: $maxFileSizeMB, in: 0.1...10.0, step: 0.1)
@@ -30,7 +30,7 @@ struct ContentSettingsView: View {
 
                     Divider()
 
-                    Text("File Extensions")
+                    Text(L("File Extensions"))
                         .font(.subheadline)
 
                     ScrollView {
@@ -56,19 +56,19 @@ struct ContentSettingsView: View {
                     .frame(maxHeight: 120)
 
                     HStack {
-                        TextField("Add extension...", text: $newExtension)
+                        TextField(L("Add extension..."), text: $newExtension)
                             .textFieldStyle(.roundedBorder)
                             .onSubmit { addExtension() }
-                        Button("Add") { addExtension() }
+                        Button(L("Add")) { addExtension() }
                             .disabled(newExtension.isEmpty)
                     }
-                    Button("Add Common Text & Code Types") { addRecommended() }
-                        .help("Plain text, Markdown, config files and source code")
+                    Button(L("Add Common Text & Code Types")) { addRecommended() }
+                        .help(L("Plain text, Markdown, config files and source code"))
                 }
             }
 
             Section {
-                Button("Apply") {
+                Button(L("Apply")) {
                     applySettings()
                 }
             }

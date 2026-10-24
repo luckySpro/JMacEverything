@@ -144,18 +144,20 @@ enum FileActions {
         ByteCountFormatter.string(fromByteCount: Int64(bitPattern: bytes), countStyle: .file)
     }
 
-    private static let relativeFormatter: RelativeDateTimeFormatter = {
+    private static var relativeFormatter: RelativeDateTimeFormatter {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
+        f.locale = L10n.shared.locale
         return f
-    }()
+    }
 
-    private static let dateFormatter: DateFormatter = {
+    private static var dateFormatter: DateFormatter {
         let f = DateFormatter()
         f.dateStyle = .medium
         f.timeStyle = .none
+        f.locale = L10n.shared.locale
         return f
-    }()
+    }
 
     /// "5 min. ago" for the last week, a calendar date otherwise.
     static func formatDate(_ t: time_t) -> String {
@@ -168,14 +170,14 @@ enum FileActions {
     }
 
     static func kind(_ item: FileItem) -> String {
-        if item.name.hasSuffix(".app") { return "Application" }
+        if item.name.hasSuffix(".app") { return L("Application") }
         switch item.type {
-        case 2: return "Folder"
-        case 3: return "Symlink"
-        case 5: return "Application"
+        case 2: return L("Folder")
+        case 3: return L("Symlink")
+        case 5: return L("Application")
         default:
             let ext = (item.name as NSString).pathExtension
-            return ext.isEmpty ? "File" : ext.uppercased()
+            return ext.isEmpty ? L("File") : ext.uppercased()
         }
     }
 }
@@ -187,17 +189,17 @@ struct FileContextMenu: View {
     let isApp: Bool
 
     var body: some View {
-        Button { FileActions.open(path, isApp: isApp) } label: { Label("Open", systemImage: "arrow.up.forward.app") }
-        Button { FileActions.openWith(path) } label: { Label("Open With…", systemImage: "square.and.arrow.up.on.square") }
-        Button { FileActions.reveal(path) } label: { Label("Reveal in Finder", systemImage: "folder") }
-        Button { FileActions.quickLook(path) } label: { Label("Quick Look", systemImage: "eye") }
-        Button { FileActions.openInTerminal(path, isDirectory: isDirectory) } label: { Label("Open in Terminal", systemImage: "terminal") }
+        Button { FileActions.open(path, isApp: isApp) } label: { Label(L("Open"), systemImage: "arrow.up.forward.app") }
+        Button { FileActions.openWith(path) } label: { Label(L("Open With…"), systemImage: "square.and.arrow.up.on.square") }
+        Button { FileActions.reveal(path) } label: { Label(L("Reveal in Finder"), systemImage: "folder") }
+        Button { FileActions.quickLook(path) } label: { Label(L("Quick Look"), systemImage: "eye") }
+        Button { FileActions.openInTerminal(path, isDirectory: isDirectory) } label: { Label(L("Open in Terminal"), systemImage: "terminal") }
         Divider()
-        Button { FileActions.copy(path) } label: { Label("Copy Path", systemImage: "doc.on.doc") }
-        Button { FileActions.copy((path as NSString).lastPathComponent) } label: { Label("Copy Name", systemImage: "textformat") }
-        Button { FileActions.copy((path as NSString).deletingLastPathComponent) } label: { Label("Copy Parent Folder", systemImage: "folder.badge.questionmark") }
+        Button { FileActions.copy(path) } label: { Label(L("Copy Path"), systemImage: "doc.on.doc") }
+        Button { FileActions.copy((path as NSString).lastPathComponent) } label: { Label(L("Copy Name"), systemImage: "textformat") }
+        Button { FileActions.copy((path as NSString).deletingLastPathComponent) } label: { Label(L("Copy Parent Folder"), systemImage: "folder.badge.questionmark") }
         Divider()
-        Button(role: .destructive) { FileActions.moveToTrash(path) } label: { Label("Move to Trash", systemImage: "trash") }
+        Button(role: .destructive) { FileActions.moveToTrash(path) } label: { Label(L("Move to Trash"), systemImage: "trash") }
     }
 }
 

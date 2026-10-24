@@ -15,6 +15,10 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 
 ![Color cards (design mock)](docs/design/color-cards.png)
 
+## 1.11 — Four languages and a menu-bar control panel
+- **Languages**: 简体中文 · 繁體中文 · English · 日本語, following the system by default; switch any time from the options menu or the menu-bar panel, no restart. Covers the main window, menus, context menus, start panel, settings windows and syntax-help section titles (syntax examples stay as typed).
+- **Menu-bar icon**: left click shows/hides the window; right click (or ⌃-click) opens a control panel in the Claude Paper style — live status (files indexed, memory), show/hide with your hotkey, rebuild index, settings, launch at login, keep running in the menu bar, MCP integrations, color cards and language, and Quit.
+
 ## 1.10 — Always in the menu bar
 - Closing the window, ⌘Q and the Dock's "Quit" now only hide JMacEverything; it keeps indexing in the menu bar and the hotkey (⌥Space) brings it back instantly
 - Only **Quit JMacEverything** in the menu-bar icon's menu really quits (logout, restart and shutdown still quit normally)

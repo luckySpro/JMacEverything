@@ -27,7 +27,7 @@ struct SearchSyntaxHelpView: View {
     // MARK: - Sections
 
     private var basicSearchSection: some View {
-        SyntaxSection(title: "Basic Search") {
+        SyntaxSection(title: L("Basic Search")) {
             SyntaxRow("hello", "Substring match (case-insensitive)")
             SyntaxRow("hello world", "AND — both must match")
             SyntaxRow("\"exact phrase\"", "Quoted exact phrase match")
@@ -35,7 +35,7 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var booleanSection: some View {
-        SyntaxSection(title: "Boolean Operators") {
+        SyntaxSection(title: L("Boolean Operators")) {
             SyntaxRow("A | B", "OR — either matches")
             SyntaxRow("!A", "NOT — exclude matches")
             SyntaxRow("<A | B>", "Grouping with angle brackets")
@@ -44,7 +44,7 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var wildcardSection: some View {
-        SyntaxSection(title: "Wildcards / Glob") {
+        SyntaxSection(title: L("Wildcards / Glob")) {
             SyntaxRow("*", "Zero or more characters")
             SyntaxRow("?", "Exactly one character")
             SyntaxRow("*.txt", "Files ending with .txt")
@@ -54,21 +54,21 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var regexSection: some View {
-        SyntaxSection(title: "Regex") {
+        SyntaxSection(title: L("Regex")) {
             SyntaxRow("regex:pattern", "ECMAScript regex (case-insensitive)")
             SyntaxNote("Example: regex:^test  regex:\\.cpp$")
         }
     }
 
     private var extensionFilterSection: some View {
-        SyntaxSection(title: "Extension Filter") {
+        SyntaxSection(title: L("Extension Filter")) {
             SyntaxRow("ext:cpp", "Files with .cpp extension")
             SyntaxRow("ext:cpp;h;hpp", "Multiple extensions (semicolon-separated)")
         }
     }
 
     private var sizeFilterSection: some View {
-        SyntaxSection(title: "Size Filter") {
+        SyntaxSection(title: L("Size Filter")) {
             SyntaxRow("size:>1mb", "Larger than 1 MB")
             SyntaxRow("size:<500kb", "Smaller than 500 KB")
             SyntaxRow("size:>=1gb", "At least 1 GB")
@@ -78,7 +78,7 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var typeFilterSection: some View {
-        SyntaxSection(title: "Type Filter") {
+        SyntaxSection(title: L("Type Filter")) {
             SyntaxRow("file:", "Match only files")
             SyntaxRow("folder:", "Match only directories")
             SyntaxRow("type:file", "Same as file:")
@@ -87,7 +87,7 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var pathFilterSection: some View {
-        SyntaxSection(title: "Path Filter") {
+        SyntaxSection(title: L("Path Filter")) {
             SyntaxRow("path:keyword", "Path contains keyword")
             SyntaxRow("nopath:keyword", "Path does not contain keyword")
             SyntaxRow("parent:dirname", "Immediate parent matches")
@@ -97,7 +97,7 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var dateFilterSection: some View {
-        SyntaxSection(title: "Date Filter") {
+        SyntaxSection(title: L("Date Filter")) {
             SyntaxNote("Prefixes: dm: (modified)  dc: (created)  da: (accessed)")
             SyntaxRow("dm:today", "Modified today")
             SyntaxRow("dm:yesterday", "Modified yesterday")
@@ -113,7 +113,7 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var lengthFilterSection: some View {
-        SyntaxSection(title: "Name Length Filter") {
+        SyntaxSection(title: L("Name Length Filter")) {
             SyntaxRow("len:>10", "Filename longer than 10 chars")
             SyntaxRow("len:<5", "Filename shorter than 5 chars")
             SyntaxRow("len:>=8", "Filename at least 8 chars")
@@ -121,7 +121,7 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var modifierSection: some View {
-        SyntaxSection(title: "Match Modifiers") {
+        SyntaxSection(title: L("Match Modifiers")) {
             SyntaxRow("case:term", "Force case-sensitive match")
             SyntaxRow("nocase:term", "Force case-insensitive match")
             SyntaxRow("ww:hello", "Whole word match")
@@ -131,7 +131,7 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var typeMacroSection: some View {
-        SyntaxSection(title: "File Type Macros") {
+        SyntaxSection(title: L("File Type Macros")) {
             SyntaxRow("audio:", "mp3, wav, flac, aac, ogg, m4a, wma, alac")
             SyntaxRow("video:", "mp4, avi, mkv, mov, wmv, flv, webm, m4v")
             SyntaxRow("pic:", "jpg, png, gif, bmp, tiff, webp, svg, heic ...")
@@ -142,7 +142,7 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var structuredPathSection: some View {
-        SyntaxSection(title: "Structured Path Query") {
+        SyntaxSection(title: L("Structured Path Query")) {
             SyntaxRow("/abc/def", "Name matches def, path contains abc")
             SyntaxRow("/abc/def/", "Directory named def under abc")
             SyntaxRow("/abc/def/*", "List children of def under abc")
@@ -152,13 +152,13 @@ struct SearchSyntaxHelpView: View {
     }
 
     private var contentSearchSection: some View {
-        SyntaxSection(title: "Content Search") {
+        SyntaxSection(title: L("Content Search")) {
             SyntaxRow("content:keyword", "Search file contents for keyword")
         }
     }
 
     private var tildeSection: some View {
-        SyntaxSection(title: "Tilde Expansion") {
+        SyntaxSection(title: L("Tilde Expansion")) {
             SyntaxRow("~/Downloads", "Expands ~ to your home directory")
             SyntaxRow("~/*.txt", "Glob in home directory")
             SyntaxNote("Only expanded when ~ is at the start of the query")

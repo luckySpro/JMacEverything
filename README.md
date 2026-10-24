@@ -25,7 +25,9 @@
 ---
 
 <p align="center">
-  <img src="assets/screen-shot.jpg" alt="MacEverything Screenshot" width="720" />
+  <img src="docs/design/hero-claude-paper.png" alt="JMacEverything — Claude Paper" width="720" /><br/>
+  <img src="docs/design/hero-ink-night.png" alt="JMacEverything — Ink Night" width="720" /><br/>
+  <sub>新界面（Claude Paper / Ink Night 配色，设计稿预览） · <a href="docs/design/color-cards.png">五套色卡</a></sub>
 </p>
 
 ## 功能亮点

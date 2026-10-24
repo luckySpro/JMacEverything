@@ -6,6 +6,7 @@ struct ContentResultRow: View {
     let keyword: String
     var isSelected: Bool = false
     var onSelect: (() -> Void)? = nil
+    @Environment(\.palette) private var palette
     @State private var isHovered = false
 
     var body: some View {
@@ -30,7 +31,7 @@ struct ContentResultRow: View {
                         .truncationMode(.middle)
                 }
 
-                highlightMatches(in: item.snippet, keyword: keyword, font: .caption, color: .secondary)
+                highlightMatches(in: item.snippet, keyword: keyword, font: .system(size: 11.5, design: .monospaced), color: palette.muted, highlightColor: palette.accent)
                     .lineLimit(2)
             }
 
@@ -40,8 +41,8 @@ struct ContentResultRow: View {
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.accentColor.opacity(0.22)
-                      : (isHovered ? Color.primary.opacity(0.05) : Color.clear))
+                .fill(isSelected ? palette.surface
+                      : (isHovered ? palette.surface.opacity(0.55) : Color.clear))
         )
         .contentShape(Rectangle())
         .onHover { hovering in

@@ -17,19 +17,68 @@ enum ResultSort: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Translucent window background
+// MARK: - Palettes ("color cards")
 
-struct VisualEffectBackground: NSViewRepresentable {
-    var material: NSVisualEffectView.Material = .underWindowBackground
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.material = material
-        v.blendingMode = .behindWindow
-        v.state = .active
-        return v
+extension Color {
+    init(hex: UInt32) {
+        self.init(.sRGB,
+                  red: Double((hex >> 16) & 0xFF) / 255,
+                  green: Double((hex >> 8) & 0xFF) / 255,
+                  blue: Double(hex & 0xFF) / 255,
+                  opacity: 1)
     }
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = material
+}
+
+struct Palette: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let isDark: Bool
+    let paper: Color      // window background
+    let surface: Color    // cards, search field, list
+    let ink: Color        // primary text
+    let muted: Color      // secondary text
+    let rule: Color       // hairlines / borders
+    let accent: Color     // selection, active tab, matches
+    let header: Color     // top bar
+    let headerInk: Color  // text on the top bar
+
+    static let claude = Palette(id: "claude", name: "Claude Paper", isDark: false,
+        paper: Color(hex: 0xF0EEE6), surface: Color(hex: 0xFAF9F5), ink: Color(hex: 0x1F1E1D),
+        muted: Color(hex: 0x73726C), rule: Color(hex: 0xDAD7CC), accent: Color(hex: 0xC9512F),
+        header: Color(hex: 0x1F1E1D), headerInk: Color(hex: 0xF0EEE6))
+
+    static let night = Palette(id: "night", name: "Ink Night", isDark: true,
+        paper: Color(hex: 0x1F1E1D), surface: Color(hex: 0x2A2927), ink: Color(hex: 0xECEAE3),
+        muted: Color(hex: 0x9C9A92), rule: Color(hex: 0x3B3A37), accent: Color(hex: 0xD97757),
+        header: Color(hex: 0x141413), headerInk: Color(hex: 0xECEAE3))
+
+    static let sage = Palette(id: "sage", name: "Sage", isDark: false,
+        paper: Color(hex: 0xEDEFE7), surface: Color(hex: 0xF8F9F4), ink: Color(hex: 0x1E2620),
+        muted: Color(hex: 0x6B7468), rule: Color(hex: 0xD3D8CC), accent: Color(hex: 0x3F7D58),
+        header: Color(hex: 0x1E2B22), headerInk: Color(hex: 0xEDEFE7))
+
+    static let indigo = Palette(id: "indigo", name: "Indigo", isDark: false,
+        paper: Color(hex: 0xECEEF3), surface: Color(hex: 0xF8F9FC), ink: Color(hex: 0x1C2030),
+        muted: Color(hex: 0x6A7085), rule: Color(hex: 0xD2D6E2), accent: Color(hex: 0x3E5BA9),
+        header: Color(hex: 0x1C2233), headerInk: Color(hex: 0xECEEF3))
+
+    static let plum = Palette(id: "plum", name: "Plum", isDark: false,
+        paper: Color(hex: 0xF3EDEE), surface: Color(hex: 0xFBF8F8), ink: Color(hex: 0x2A1E22),
+        muted: Color(hex: 0x7A6A6F), rule: Color(hex: 0xE0D3D6), accent: Color(hex: 0xB4466A),
+        header: Color(hex: 0x2A1C22), headerInk: Color(hex: 0xF3EDEE))
+
+    static let all: [Palette] = [.claude, .night, .sage, .indigo, .plum]
+    static func named(_ id: String) -> Palette { all.first { $0.id == id } ?? .claude }
+}
+
+private struct PaletteKey: EnvironmentKey {
+    static let defaultValue: Palette = .claude
+}
+
+extension EnvironmentValues {
+    var palette: Palette {
+        get { self[PaletteKey.self] }
+        set { self[PaletteKey.self] = newValue }
     }
 }
 
@@ -42,9 +91,10 @@ struct ContentView: View {
     @State private var selectedIndex: Int = 0
     @AppStorage("resultSort") private var sortRaw: String = ResultSort.relevance.rawValue
     @AppStorage("resultSortAscending") private var sortAscending: Bool = true
-    @AppStorage("showTypeFilters") private var showTypeFilters: Bool = true
+    @AppStorage("paletteID") private var paletteID: String = Palette.claude.id
     @FocusState private var isSearchFieldFocused: Bool
 
+    private var palette: Palette { Palette.named(paletteID) }
     private var sort: ResultSort { ResultSort(rawValue: sortRaw) ?? .relevance }
 
     /// Results in display order (relevance = engine order).
@@ -71,18 +121,22 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            headerBar
             PermissionView()
             searchBar
-            if showTypeFilters && !viewModel.isContentSearch {
-                filterBar
-            }
-            Divider().opacity(0.6)
+            metaBar
+            DoubleRule(color: palette.ink)
+                .padding(.horizontal, 24)
             resultsArea
-            Divider().opacity(0.6)
+            Rectangle().fill(palette.rule).frame(height: 1)
             footer
         }
-        .frame(minWidth: 680, minHeight: 440)
-        .background(VisualEffectBackground().ignoresSafeArea())
+        .frame(minWidth: 720, minHeight: 460)
+        .foregroundStyle(palette.ink)
+        .background(palette.paper.ignoresSafeArea())
+        .tint(palette.accent)
+        .environment(\.palette, palette)
+        .preferredColorScheme(palette.isDark ? .dark : .light)
         .onChange(of: viewModel.searchText) { selectedIndex = 0 }
         .onChange(of: searchOptions.typeFilter) { selectedIndex = 0 }
         .onReceive(NotificationCenter.default.publisher(for: .rebuildIndex)) { _ in
@@ -100,14 +154,73 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Search bar
+    // MARK: Header (dark bar with numbered tabs, like AutoCoder)
+
+    private var headerBar: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "scope")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(palette.accent)
+                Text("JMACEVERYTHING")
+                    .font(.system(size: 13, weight: .heavy))
+                    .tracking(2.2)
+                Rectangle().fill(palette.headerInk.opacity(0.25)).frame(width: 1, height: 16)
+                Text("Search")
+                    .font(.system(size: 12))
+                    .opacity(0.6)
+            }
+            .padding(.trailing, 22)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 2) {
+                    ForEach(Array(TypeFilter.allCases.enumerated()), id: \.element) { idx, f in
+                        HeaderTab(number: idx + 1, title: f.title,
+                                  isOn: searchOptions.typeFilter == f) {
+                            searchOptions.typeFilter = f
+                            isSearchFieldFocused = true
+                        }
+                    }
+                }
+            }
+
+            Spacer(minLength: 8)
+            paletteMenu
+            optionsMenu
+        }
+        .foregroundStyle(palette.headerInk)
+        .padding(.leading, 84)      // clear the traffic lights
+        .padding(.trailing, 14)
+        .frame(height: 50)
+        .background(palette.header.ignoresSafeArea(edges: .top))
+    }
+
+    private var paletteMenu: some View {
+        Menu {
+            Picker("Color Card", selection: $paletteID) {
+                ForEach(Palette.all) { p in Text(p.name).tag(p.id) }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: "paintpalette")
+                .font(.system(size: 14))
+                .foregroundStyle(palette.headerInk.opacity(0.8))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .padding(.horizontal, 8)
+        .help("Color card")
+    }
+
+    // MARK: Search field
 
     private var searchBar: some View {
         HStack(spacing: 12) {
             Image(systemName: viewModel.isContentSearch ? "doc.text.magnifyingglass" : "magnifyingglass")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 24)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(palette.muted)
+                .frame(width: 22)
             HighlightedSearchField(
                 text: $viewModel.searchText,
                 placeholder: "Search files and folders…",
@@ -133,17 +246,24 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 15))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(palette.muted.opacity(0.7))
                 }
                 .buttonStyle(.plain)
                 .help("Clear (Esc)")
                 .accessibilityIdentifier("clearButton")
             }
-            optionsMenu
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 34)      // room for the traffic lights (hidden title bar)
-        .padding(.bottom, 14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 6).fill(palette.surface))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(isSearchFieldFocused ? palette.accent : palette.rule,
+                              lineWidth: isSearchFieldFocused ? 1.5 : 1)
+        )
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+        .padding(.bottom, 12)
     }
 
     private var optionsMenu: some View {
@@ -153,14 +273,13 @@ struct ContentView: View {
             Toggle("Whole Word", isOn: $searchOptions.isWholeWord)
             Toggle("Match Whole Filename", isOn: $searchOptions.isMatchFilename)
             Divider()
-            Toggle("Show Type Filters", isOn: $showTypeFilters)
-            Divider()
             Button("Search Syntax Help") { SearchSyntaxHelpWindowController.shared.showWindow() }
             Button("Content Settings…") { ContentSettingsWindowController.shared.showWindow() }
             Button("Shortcut Settings…") { ShortcutSettingsWindowController.shared.showWindow() }
         } label: {
             Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 15))
+                .font(.system(size: 14))
+                .foregroundStyle(palette.headerInk.opacity(0.8))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -168,22 +287,17 @@ struct ContentView: View {
         .help("Search options")
     }
 
-    // MARK: Filter chips + sort
+    // MARK: Meta strip (status + sort)
 
-    private var filterBar: some View {
-        HStack(spacing: 6) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(TypeFilter.allCases) { f in
-                        FilterChip(title: f.title, symbol: f.symbol,
-                                   isOn: searchOptions.typeFilter == f) {
-                            searchOptions.typeFilter = f
-                            isSearchFieldFocused = true
-                        }
-                    }
-                }
-                .padding(.vertical, 1)
-            }
+    private var metaBar: some View {
+        HStack(spacing: 8) {
+            Text(viewModel.showingRecent ? "RECENT" : (viewModel.isContentSearch ? "CONTENT" : "RESULTS"))
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .tracking(1.2)
+                .foregroundStyle(palette.accent)
+            statusIndicator
+                .font(.system(size: 11.5, design: .monospaced))
+                .foregroundStyle(palette.muted)
             Spacer(minLength: 8)
             Menu {
                 Picker("Sort By", selection: $sortRaw) {
@@ -197,13 +311,14 @@ struct ContentView: View {
                     Image(systemName: "arrow.up.arrow.down")
                     Text(sort.title)
                 }
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(palette.ink)
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
             .help("Sort loaded results")
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 26)
         .padding(.bottom, 10)
     }
 
@@ -237,7 +352,7 @@ struct ContentView: View {
     private var fileResults: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 2) {
+                LazyVStack(spacing: 0) {
                     if viewModel.showingRecent && !items.isEmpty {
                         SectionHeader(symbol: "clock", title: "Recently Modified")
                     }
@@ -257,8 +372,8 @@ struct ContentView: View {
                         .onAppear { viewModel.loadMore() }
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
             .id(scrollViewID)
             .accessibilityIdentifier("fileResultsList")
@@ -294,7 +409,7 @@ struct ContentView: View {
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 2) {
+                    LazyVStack(spacing: 0) {
                         ForEach(Array(viewModel.contentResults.enumerated()), id: \.element.id) { idx, item in
                             ContentResultRow(item: item, keyword: viewModel.contentKeyword,
                                              isSelected: idx == selectedIndex,
@@ -302,8 +417,8 @@ struct ContentView: View {
                                 .id(item.id)
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                 }
                 .id(scrollViewID)
                 .accessibilityIdentifier("contentResultsList")
@@ -319,20 +434,20 @@ struct ContentView: View {
     // MARK: Footer
 
     private var footer: some View {
-        HStack(spacing: 10) {
-            statusIndicator
+        HStack(spacing: 14) {
+            KeyHint(keys: "↑↓", label: "Select")
+            KeyHint(keys: "↩", label: "Open")
+            KeyHint(keys: "⌘↩", label: "Reveal")
+            KeyHint(keys: "⌘Y", label: "Quick Look")
+            KeyHint(keys: "⌥⌘C", label: "Copy Path")
             Spacer()
-            if resultCount > 0 {
-                KeyHint(keys: "↩", label: "Open")
-                KeyHint(keys: "⌘↩", label: "Reveal")
-                KeyHint(keys: "⌘Y", label: "Quick Look")
-                KeyHint(keys: "⌥⌘C", label: "Copy Path")
-            }
+            Text("⌘1–9 filters · Esc hide")
         }
-        .font(.system(size: 11.5))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
+        .font(.system(size: 11))
+        .foregroundStyle(palette.muted)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 8)
+        .background(palette.surface.opacity(0.6))
         .accessibilityIdentifier("statusBar")
     }
 
@@ -435,6 +550,47 @@ struct ContentView: View {
 
 // MARK: - Small components
 
+private struct HeaderTab: View {
+    let number: Int
+    let title: String
+    let isOn: Bool
+    let action: () -> Void
+    @Environment(\.palette) private var palette
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(String(format: "%02d", number))
+                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                    .foregroundStyle(isOn ? palette.accent : palette.headerInk.opacity(0.45))
+                Text(title)
+                    .font(.system(size: 13, weight: isOn ? .semibold : .regular))
+                    .foregroundStyle(palette.headerInk.opacity(isOn ? 1 : (hovered ? 0.85 : 0.65)))
+            }
+            .padding(.horizontal, 11)
+            .frame(height: 50)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(isOn ? palette.accent : .clear).frame(height: 3)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+}
+
+/// The heavy double rule under the title area in AutoCoder.
+private struct DoubleRule: View {
+    let color: Color
+    var body: some View {
+        VStack(spacing: 2) {
+            Rectangle().fill(color).frame(height: 1.5)
+            Rectangle().fill(color).frame(height: 1)
+        }
+    }
+}
+
 private struct FilterChip: View {
     let title: String
     let symbol: String
@@ -472,7 +628,7 @@ private struct SectionHeader: View {
             Spacer()
         }
         .font(.system(size: 10.5, weight: .semibold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.secondary)
         .padding(.horizontal, 10)
         .padding(.top, 4)
         .padding(.bottom, 2)
@@ -488,7 +644,7 @@ private struct KeyHint: View {
                 .font(.system(size: 10.5, weight: .medium, design: .rounded))
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1)
-                .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.08)))
+                .background(RoundedRectangle(cornerRadius: 3).strokeBorder(Color.secondary.opacity(0.5), lineWidth: 1))
             Text(label)
         }
     }
@@ -507,10 +663,10 @@ private struct EmptyStateView: View {
                 ProgressView().controlSize(.regular)
             } else {
                 Image(systemName: symbol)
-                    .font(.system(size: 40, weight: .light))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 34, weight: .light))
+                    .foregroundStyle(Color.secondary.opacity(0.6))
             }
-            Text(title).font(.system(size: 15, weight: .semibold))
+            Text(title).font(.system(size: 22, weight: .heavy))
             Text(subtitle)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)

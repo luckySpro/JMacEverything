@@ -189,6 +189,7 @@ struct ResultRow: View {
     let hints: [HighlightHint]
     var isSelected: Bool = false
     var onSelect: (() -> Void)? = nil
+    @Environment(\.palette) private var palette
     @State private var isHovered = false
 
     var body: some View {
@@ -202,8 +203,9 @@ struct ResultRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 let highlighted = highlightCrossMatches(
                     path: item.path, name: item.name, hints: hints,
-                    nameFont: .system(size: 14, weight: .medium), nameColor: .primary,
-                    pathFont: .system(size: 11.5), pathColor: .secondary)
+                    nameFont: .system(size: 14, weight: .semibold), nameColor: palette.ink,
+                    pathFont: .system(size: 11, design: .monospaced), pathColor: palette.muted,
+                    highlightColor: palette.accent)
                 highlighted.nameText.lineLimit(1)
                 highlighted.pathText.lineLimit(1).truncationMode(.middle)
             }
@@ -212,35 +214,37 @@ struct ResultRow: View {
 
             VStack(alignment: .trailing, spacing: 2) {
                 Text(FileActions.formatDate(item.modTime))
-                    .font(.system(size: 11.5))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(palette.muted)
                 HStack(spacing: 6) {
                     Text(FileActions.kind(item))
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundColor(palette.muted)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.primary.opacity(0.06)))
+                        .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(palette.rule, lineWidth: 1))
                     if item.type == 1 && item.size > 0 {
                         Text(FileActions.formatSize(item.size))
-                            .font(.system(size: 11.5).monospacedDigit())
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(palette.muted)
                     }
                 }
             }
             .frame(minWidth: 110, alignment: .trailing)
         }
-        .padding(.vertical, 7)
-        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.22)
-                      : (isHovered ? Color.primary.opacity(0.05) : Color.clear))
+            Rectangle().fill(isSelected ? palette.surface
+                             : (isHovered ? palette.surface.opacity(0.55) : Color.clear))
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(isSelected ? Color.accentColor.opacity(0.45) : Color.clear, lineWidth: 1)
-        )
+        .overlay(alignment: .leading) {
+            Rectangle().fill(isSelected ? palette.accent : Color.clear).frame(width: 3)
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(palette.rule.opacity(0.7)).frame(height: 1)
+        }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .contextMenu {

@@ -27,7 +27,7 @@ struct MacEverythingApp: App {
             CommandMenu("Filter") {
                 ForEach(Array(TypeFilter.allCases.enumerated()), id: \.element) { idx, f in
                     Button(f.title) { searchOptions.typeFilter = f }
-                        .keyboardShortcut(KeyEquivalent(Character("\(idx)")), modifiers: [.command])
+                        .keyboardShortcut(KeyEquivalent(Character("\(idx + 1)")), modifiers: [.command])
                 }
             }
 

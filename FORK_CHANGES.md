@@ -8,6 +8,13 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 - Rows: 32px icons, middle-truncated paths, modified date, kind tag and size on the right
 - Real selection highlight; friendly empty states; compact status footer with keyboard hints
 
+## 1.4 — AutoCoder-style theme and color cards
+- Dark top bar with the JMACEVERYTHING wordmark and numbered type tabs (`01 All … 09 Archives`, ⌘1–⌘9)
+- Warm paper background, bordered search field, monospaced status strip, heavy double rule, list rows with hairlines and an accent bar on the selected row
+- Five color cards, switchable from the palette icon in the top bar (remembered between launches): **Claude Paper** (default), **Ink Night** (dark), **Sage**, **Indigo**, **Plum**
+
+![Color cards (design mock)](docs/design/color-cards.png)
+
 ## New features
 | Feature | How |
 |---|---|

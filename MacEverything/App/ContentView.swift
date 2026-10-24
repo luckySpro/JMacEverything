@@ -794,7 +794,7 @@ private struct StartPanel: View {
                                 .font(.system(size: 11.5))
                                 .foregroundStyle(palette.accent)
                         }
-                        FlowRow(items: recent) { q in
+                        ChipFlowRow(items: recent) { q in
                             HStack(spacing: 6) {
                                 Image(systemName: "clock.arrow.circlepath").font(.system(size: 10))
                                 Text(q).font(.system(size: 12.5, design: .monospaced)).lineLimit(1)
@@ -857,18 +857,18 @@ private struct StartPanel: View {
 }
 
 /// Minimal wrapping row for chips.
-private struct FlowRow<Content: View>: View {
+private struct ChipFlowRow<Content: View>: View {
     let items: [String]
     let content: (String) -> Content
 
     var body: some View {
-        FlowLayout(spacing: 6) {
+        ChipFlowLayout(spacing: 6) {
             ForEach(items, id: \.self) { content($0) }
         }
     }
 }
 
-private struct FlowLayout: Layout {
+private struct ChipFlowLayout: Layout {
     var spacing: CGFloat = 6
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

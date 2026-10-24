@@ -6,7 +6,7 @@ struct MacEverythingApp: App {
     @ObservedObject private var searchOptions = SearchOptions.shared
 
     var body: some Scene {
-        Window("MacEverything", id: "main") {
+        Window("JMacEverything", id: "main") {
             ContentView()
         }
         .windowStyle(.hiddenTitleBar)

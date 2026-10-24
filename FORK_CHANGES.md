@@ -15,6 +15,11 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 
 ![Color cards (design mock)](docs/design/color-cards.png)
 
+## 1.6 — Own name and icon
+- The app is now **JMacEverything.app** (window title, menu-bar items, DMG volume and files)
+- New icon: terracotta magnifier with a cream "J" on warm ink, matching the Claude Paper palette
+- Bundle ID stays `com.maceverything.app`, so the existing index cache and settings keep working
+
 ## Quick query (Everything syntax without typing it)
 - A **QUICK** chip row under the search field: Today · This Week · Last Month · > 100 MB · > 1 GB · In Path… · Extension… · Exclude… · OR. Complete filters toggle on/off (highlighted when active); partial ones insert the prefix and leave the caret ready to type.
 - **Query** menu with ⌃⌥ shortcuts: ⌃⌥T today, ⌃⌥W this week, ⌃⌥M last month, ⌃⌥B > 100 MB, ⌃⌥G > 1 GB, ⌃⌥F files only, ⌃⌥D folders only, ⌃⌥P `path:`, ⌃⌥E `ext:`, ⌃⌥X exclude `!`, ⌃⌥O OR `|`, ⌃⌥R `regex:`

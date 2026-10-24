@@ -15,7 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // Delay by one frame to let SwiftUI create the window
         DispatchQueue.main.async { [weak self] in
-            self?.mainSearchWindow = NSApp.windows.first { $0.title == "MacEverything" }
+            self?.mainSearchWindow = NSApp.windows.first { $0.title == "JMacEverything" }
             if shouldMinimize {
                 self?.mainSearchWindow?.orderOut(nil)
                 NSApp.hide(nil)
@@ -50,12 +50,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "MacEverything")
+            button.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "JMacEverything")
         }
 
         let menu = NSMenu()
         menu.delegate = self
-        menu.addItem(NSMenuItem(title: "Show MacEverything", action: #selector(toggleWindow), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Show JMacEverything", action: #selector(toggleWindow), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Rebuild Index", action: #selector(rebuildIndex), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Shortcut Settings...", action: #selector(openShortcutSettings), keyEquivalent: ""))
@@ -78,7 +78,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         launchAtLoginItem = loginItem
         menu.addItem(loginItem)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit MacEverything", action: #selector(quitApp), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quit JMacEverything", action: #selector(quitApp), keyEquivalent: "q"))
         statusItem?.menu = menu
     }
 
@@ -87,7 +87,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         if let item = menu.items.first {
             let isVisible = mainSearchWindow?.isVisible ?? false
-            item.title = isVisible ? "Hide MacEverything" : "Show MacEverything"
+            item.title = isVisible ? "Hide JMacEverything" : "Show JMacEverything"
         }
         launchAtLoginItem?.state = SMAppService.mainApp.status == .enabled ? .on : .off
         for (client, item) in mcpMenuItems {

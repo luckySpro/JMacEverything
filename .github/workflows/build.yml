@@ -42,13 +42,17 @@ jobs:
 
       - name: Bundle Homebrew dylibs into the app
         run: |
-          APP=build/Release/MacEverything.app
-          dylibbundler -od -b -cd \
-            -x "$APP/Contents/MacOS/MacEverything" \
+          APP=build/Release/JMacEverything.app
+          BINS=("$APP/Contents/MacOS/JMacEverything")
+          [ -f "$APP/Contents/MacOS/MacEverythingMCP" ] && BINS+=("$APP/Contents/MacOS/MacEverythingMCP")
+          ARGS=(); for b in "${BINS[@]}"; do ARGS+=(-x "$b"); done
+          dylibbundler -od -b -cd "${ARGS[@]}" \
             -d "$APP/Contents/Frameworks" \
             -p @executable_path/../Frameworks/
           # Fail if anything still points at Homebrew
-          ! otool -L "$APP/Contents/MacOS/MacEverything" | grep -q /opt/homebrew
+          for b in "${BINS[@]}" "$APP"/Contents/Frameworks/*.dylib; do
+            if otool -L "$b" | grep -q /opt/homebrew; then echo "::error::$b still links Homebrew"; exit 1; fi
+          done
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep "$APP"
 
@@ -57,8 +61,8 @@ jobs:
           VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" MacEverything/Info.plist)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           mkdir -p dist
-          ditto -c -k --keepParent build/Release/MacEverything.app "dist/JMacEverything-$VERSION-arm64.zip"
-          hdiutil create -volname JMacEverything -srcfolder build/Release/MacEverything.app \
+          ditto -c -k --keepParent build/Release/JMacEverything.app "dist/JMacEverything-$VERSION-arm64.zip"
+          hdiutil create -volname JMacEverything -srcfolder build/Release/JMacEverything.app \
             -ov -format UDZO "dist/JMacEverything-$VERSION-arm64.dmg"
           (cd dist && shasum -a 256 * > SHA256SUMS.txt)
 

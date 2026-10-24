@@ -102,7 +102,7 @@
 		A2000010 /* MacEverything-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "MacEverything-Bridging-Header.h"; sourceTree = "<group>"; };
 		A2000011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2000012 /* MacEverything.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MacEverything.entitlements; sourceTree = "<group>"; };
-		A2000099 /* MacEverything.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacEverything.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000099 /* JMacEverything.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JMacEverything.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A200001A /* ShortcutSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutSettingsView.swift; sourceTree = "<group>"; };
 		A200001B /* ContentIndex.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ContentIndex.h; sourceTree = "<group>"; };
 		A200001C /* ContentIndex.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ContentIndex.cpp; sourceTree = "<group>"; };
@@ -348,7 +348,7 @@
 		A4000007 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A2000099 /* MacEverything.app */,
+				A2000099 /* JMacEverything.app */,
 				B2000002 /* MacEverythingUITests.xctest */,
 				C2000099 /* MacEverythingMCP */,
 			);
@@ -374,7 +374,7 @@
 			);
 			name = MacEverything;
 			productName = MacEverything;
-			productReference = A2000099 /* MacEverything.app */;
+			productReference = A2000099 /* JMacEverything.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B5000001 /* MacEverythingUITests */ = {
@@ -579,7 +579,8 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.maceverything.app;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = JMacEverything;
+				PRODUCT_MODULE_NAME = MacEverything;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "MacEverything/MacEverything-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -612,7 +613,8 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.maceverything.app;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = JMacEverything;
+				PRODUCT_MODULE_NAME = MacEverything;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "MacEverything/MacEverything-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

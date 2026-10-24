@@ -15,6 +15,12 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 
 ![Color cards (design mock)](docs/design/color-cards.png)
 
+## 1.9 — Memory diet
+- `pathIndex_` (full path → record) stored every full path a second time as a `std::string` key: ~0.5 GB for 2.5M files. It now keeps only a 64-bit hash per file in an open-addressed table (`Core/PathIndexMap.h`), ~65 MB. Prefix deletes rebuild the path from the existing pools. Verified against the old engine with a randomized add/remove/update/prefix-rescan/compaction test (ASan clean, identical results).
+- Trigram / path / extension posting lists drop their growth slack after building (~85 MB+ on large disks).
+- Memory freed after the initial scan, index load and content indexing is handed back to macOS (`malloc_zone_pressure_relief`), instead of staying in the process footprint.
+- Footer shows the app's current memory (same number as Activity Monitor).
+
 ## 1.8 — grep inside files (ideas from [fsearch](https://github.com/noahdunnagan/fsearch))
 - `grep:` / `infile:` / `content:` can appear **anywhere** and combine with any filter: `ext:swift grep:TODO`, `path:Projects grep:"open file"`
 - Shows **every matching line with its line number** (up to 20 per file), grouped by file; lines are read fresh from disk

@@ -604,6 +604,12 @@ struct ContentView: View {
             KeyHint(keys: "⌘Y", label: "Quick Look")
             KeyHint(keys: "⌥⌘C", label: "Copy Path")
             Spacer()
+            if viewModel.memoryFootprint > 0 {
+                Text("RAM \(ByteCountFormatter.string(fromByteCount: Int64(viewModel.memoryFootprint), countStyle: .memory))")
+                    .monospacedDigit()
+                    .help("Memory used by JMacEverything (same as Activity Monitor)")
+                Text("·")
+            }
             Text("⌘1–9 filters · Esc hide")
         }
         .font(.system(size: 11))

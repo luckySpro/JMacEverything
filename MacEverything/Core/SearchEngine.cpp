@@ -34,6 +34,31 @@ uint32_t SearchEngine::internPath(const std::string& path) {
     return pIdx;
 }
 
+bool SearchEngine::recordUnderLowerPrefix(uint32_t idx, std::string_view lowerPrefix) const {
+    if (idx >= pathIndices_.size()) return false;
+    std::string_view dir = lowerPathPool_.view(pathIndices_[idx]);
+    std::string_view name = namePool_.view(idx);
+    // Full path = dir + ("/" unless dir is empty or ends with "/") + name
+    const bool slash = !(dir.empty() || dir.back() == '/');
+    const size_t fullLen = dir.size() + (slash ? 1 : 0) + name.size();
+    if (fullLen < lowerPrefix.size()) return false;
+    auto charAt = [&](size_t i) -> char {
+        if (i < dir.size()) return dir[i];
+        i -= dir.size();
+        if (slash) { if (i == 0) return '/'; i -= 1; }
+        return name[i];
+    };
+    // Compare the prefix (fast path: prefix inside the directory part)
+    if (lowerPrefix.size() <= dir.size()) {
+        if (dir.compare(0, lowerPrefix.size(), lowerPrefix) != 0) return false;
+    } else {
+        for (size_t i = 0; i < lowerPrefix.size(); i++) {
+            if (charAt(i) != lowerPrefix[i]) return false;
+        }
+    }
+    return fullLen == lowerPrefix.size() || charAt(lowerPrefix.size()) == '/';
+}
+
 void SearchEngine::tombstoneAt(uint32_t idx) {
     types_[idx] = 0;
     markPageDirty(idx);
@@ -396,10 +421,7 @@ uint32_t SearchEngine::removeByPathPrefix(const std::string& pathPrefix) {
     std::string lowerPrefix = me::toLower(pathPrefix);
     uint32_t removed = 0;
     for (auto it = pathIndex_.begin(); it != pathIndex_.end(); ) {
-        const auto& path = it->first;
-        if (path.size() >= lowerPrefix.size() &&
-            path.compare(0, lowerPrefix.size(), lowerPrefix) == 0 &&
-            (path.size() == lowerPrefix.size() || path[lowerPrefix.size()] == '/')) {
+        if (recordUnderLowerPrefix(it->second, lowerPrefix)) {
             uint32_t idx = it->second;
 
             // H-4: Write WAL entry for each removed path
@@ -435,10 +457,7 @@ uint32_t SearchEngine::batchRescanPrefix(const std::string& pathPrefix,
     std::string lowerPrefix = me::toLower(pathPrefix);
     uint32_t removed = 0;
     for (auto it = pathIndex_.begin(); it != pathIndex_.end(); ) {
-        const auto& path = it->first;
-        if (path.size() >= lowerPrefix.size() &&
-            path.compare(0, lowerPrefix.size(), lowerPrefix) == 0 &&
-            (path.size() == lowerPrefix.size() || path[lowerPrefix.size()] == '/')) {
+        if (recordUnderLowerPrefix(it->second, lowerPrefix)) {
             uint32_t idx = it->second;
 
             // Write WAL Remove entry for each removed path
@@ -571,7 +590,7 @@ std::unordered_map<uint32_t, uint32_t> SearchEngine::compactRecords() {
     StringPool snapOrigNamePool;
     std::vector<uint32_t> snapPathIndices;
     StringPool snapPathPool;
-    std::unordered_map<std::string, uint32_t> snapPathIndex;
+    PathIndexMap snapPathIndex;
     uint32_t snapSize;
     {
         std::shared_lock lock(mutex_);
@@ -617,7 +636,7 @@ std::unordered_map<uint32_t, uint32_t> SearchEngine::compactRecords() {
     StringPool cdLowerPathPool;
     std::unordered_map<std::string, uint32_t> cdPathLookup;
     std::unordered_map<std::string, uint32_t> cdLowerPathLookup;
-    std::unordered_map<std::string, uint32_t> cdPathIndex;
+    PathIndexMap cdPathIndex;
     cdPathIndex.reserve(snapSize);
 
     for (size_t i = 0; i < snapSize; i++) {

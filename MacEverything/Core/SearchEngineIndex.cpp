@@ -127,6 +127,7 @@ SearchEngine::buildTrigramIndexFromData(const std::vector<uint8_t>& types,
     for (auto& [trigram, list] : index) {
         std::sort(list.begin(), list.end());
     }
+    for (auto& kv : index) kv.second.shrink_to_fit(); // drop growth slack (memory)
     return index;
 }
 
@@ -197,6 +198,7 @@ SearchEngine::buildExtensionIndexFromData(const std::vector<uint8_t>& types,
         }
     }
     // Posting lists are already in order since we iterate i = 0..N
+    for (auto& kv : index) kv.second.shrink_to_fit(); // drop growth slack (memory)
     return index;
 }
 
@@ -250,6 +252,7 @@ SearchEngine::buildPathTrigramIndexFromData(const StringPool& lowerPathPool) {
     for (auto& [_, list] : index) {
         std::sort(list.begin(), list.end());
     }
+    for (auto& kv : index) kv.second.shrink_to_fit(); // drop growth slack (memory)
     return index;
 }
 
@@ -268,6 +271,7 @@ SearchEngine::buildPathIdxToRecordsFromData(const std::vector<uint8_t>& types,
     for (auto& list : mapping) {
         std::sort(list.begin(), list.end());
     }
+    for (auto& v : mapping) v.shrink_to_fit(); // drop growth slack (memory)
     return mapping;
 }
 

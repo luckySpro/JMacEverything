@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <shared_mutex>
 #include <unordered_map>
+#include "PathIndexMap.h"
 #include <atomic>
 #include <memory>
 #include <map>
@@ -384,7 +385,7 @@ private:
     std::vector<int32_t>  devIds_;         // device ID
     std::unordered_map<std::string, uint32_t> pathLookup_; // path string -> pathPool_ index
     std::unordered_map<std::string, uint32_t> lowerPathLookup_; // lowered path -> pathPool_ index
-    std::unordered_map<std::string, uint32_t> pathIndex_; // fullPath -> record index
+    PathIndexMap pathIndex_; // hash(lower-case fullPath) -> record index (see PathIndexMap.h)
     std::atomic<uint32_t> liveCount_{0};
     mutable std::shared_mutex mutex_;
 
@@ -401,6 +402,10 @@ private:
     /// Intern a directory path into pathPool_ and lowerPathPool_. Returns pathPool_ index.
     /// Deduplicates via pathLookup_. Must be called under unique_lock.
     uint32_t internPath(const std::string& path);
+
+    /// True if the live record's lower-case full path equals lowerPrefix or lies under it.
+    /// Rebuilt from the pools (pathIndex_ only stores hashes). Caller holds the lock.
+    bool recordUnderLowerPrefix(uint32_t idx, std::string_view lowerPrefix) const;
 
     /// Tombstone a record at idx: clear SoA columns. Must be called under unique_lock.
     void tombstoneAt(uint32_t idx);

@@ -1,5 +1,36 @@
 import Foundation
 import Combine
+import Darwin
+
+/// Process memory as Activity Monitor reports it ("Memory" column = phys_footprint).
+enum MemoryStats {
+    static func footprintBytes() -> UInt64 {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let kr = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return kr == KERN_SUCCESS ? info.phys_footprint : 0
+    }
+
+    /// Return memory freed after big one-off work (initial scan, index load, compaction)
+    /// to the system. macOS malloc otherwise keeps those pages, inflating the footprint.
+    static func releaseFreedMemory(force: Bool = true) {
+        let now = Date()
+        lock.lock()
+        let due = force || now.timeIntervalSince(lastRelief) > 60
+        if due { lastRelief = now }
+        lock.unlock()
+        guard due else { return }
+        DispatchQueue.global(qos: .utility).async {
+            _ = malloc_zone_pressure_relief(nil, 0)
+        }
+    }
+    private static let lock = NSLock()
+    private static var lastRelief = Date.distantPast
+}
 
 struct FileItem: Identifiable {
     let id: String      // path-based stable ID
@@ -217,6 +248,9 @@ class SearchViewModel: ObservableObject {
     @Published var contentIsRegex: Bool = false
     @Published var contentNotice: String? = nil
     @Published var contentScannedFiles: Int = 0
+    /// Current process footprint in bytes (refreshed every few seconds).
+    @Published var memoryFootprint: UInt64 = 0
+    private var memoryTimer: Timer?
 
     /// Structured highlight hints extracted from the C++ query AST.
     /// Replaces the old keyword-based approach with field-aware, mode-aware hints.
@@ -285,6 +319,10 @@ class SearchViewModel: ObservableObject {
             }
         }
         startIncremental()
+        memoryFootprint = MemoryStats.footprintBytes()
+        memoryTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.memoryFootprint = MemoryStats.footprintBytes() }
+        }
     }
 
     private func onSearchOptionsChanged() {
@@ -319,6 +357,7 @@ class SearchViewModel: ObservableObject {
                 self.isContentIndexing = false
                 self.contentIndexProgress = nil
                 self.contentIndexedCount = totalIndexed
+                MemoryStats.releaseFreedMemory()
                 // Auto-refresh content search results after indexing completes
                 if self.isContentSearch && !self.contentKeyword.isEmpty {
                     self.performContentSearch(self.searchText)
@@ -341,6 +380,7 @@ class SearchViewModel: ObservableObject {
                 self.totalRecords = count
                 self.isScanning = false
                 self.scanComplete = true
+                MemoryStats.releaseFreedMemory()
                 self.isMonitoring = self.bridge.isMonitoring
                 self.isSyncing = self.bridge.isSyncing
 
@@ -619,6 +659,7 @@ class SearchViewModel: ObservableObject {
     }
 
     private func performIndexRefresh() {
+        MemoryStats.releaseFreedMemory(force: false)
         totalRecords = bridge.liveRecordCount()
         isMonitoring = bridge.isMonitoring
         isSyncing = bridge.isSyncing

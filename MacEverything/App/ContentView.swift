@@ -757,14 +757,20 @@ private struct StartPanel: View {
     let onClear: () -> Void
     @Environment(\.palette) private var palette
 
-    private let examples: [(String, String)] = [
-        ("*.pdf", "All PDFs"),
-        ("dm:today", "Changed today"),
-        ("size:>1gb", "Huge files"),
-        ("ext:swift todo", "Swift files named todo"),
-        ("folder: project", "Folders named project"),
-        ("~/Downloads *.dmg", "Installers in Downloads"),
-        ("infile:password", "Text inside files"),
+    private struct Example: Identifiable {
+        let query: String
+        let note: String
+        var id: String { query }
+    }
+
+    private let examples: [Example] = [
+        Example(query: "*.pdf", note: "All PDFs"),
+        Example(query: "dm:today", note: "Changed today"),
+        Example(query: "size:>1gb", note: "Huge files"),
+        Example(query: "ext:swift todo", note: "Swift files named todo"),
+        Example(query: "folder: project", note: "Folders named project"),
+        Example(query: "~/Downloads *.dmg", note: "Installers in Downloads"),
+        Example(query: "infile:password", note: "Text inside files"),
     ]
 
     var body: some View {
@@ -809,14 +815,14 @@ private struct StartPanel: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     label("TRY").padding(.bottom, 8)
-                    ForEach(examples, id: \.0) { ex in
-                        Button { onPick(ex.0) } label: {
+                    ForEach(examples) { ex in
+                        Button { onPick(ex.query) } label: {
                             HStack {
-                                Text(ex.0)
+                                Text(ex.query)
                                     .font(.system(size: 12.5, weight: .medium, design: .monospaced))
                                     .foregroundStyle(palette.accent)
                                     .frame(width: 190, alignment: .leading)
-                                Text(ex.1)
+                                Text(ex.note)
                                     .font(.system(size: 12.5))
                                     .foregroundStyle(palette.muted)
                                 Spacer()

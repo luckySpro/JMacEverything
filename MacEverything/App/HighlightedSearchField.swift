@@ -223,9 +223,15 @@ struct HighlightedSearchField: NSViewRepresentable {
         if textView.string != text {
             context.coordinator.isUpdatingFromSwiftUI = true
             let selectedRanges = textView.selectedRanges
+            let previous = textView.string
             textView.string = text
             context.coordinator.applyHighlighting(textView)
-            textView.selectedRanges = selectedRanges
+            if text.count != previous.count, !text.isEmpty {
+                // Programmatic insert (quick query, ghost accept): caret goes to the end
+                textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+            } else {
+                textView.selectedRanges = selectedRanges
+            }
             context.coordinator.isUpdatingFromSwiftUI = false
         }
 

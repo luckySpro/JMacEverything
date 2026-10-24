@@ -82,6 +82,102 @@ extension EnvironmentValues {
     }
 }
 
+// MARK: - Quick query tokens (Everything syntax, one click / one shortcut)
+
+enum QuickQuery: String, CaseIterable, Identifiable {
+    case today, thisWeek, lastMonth, big, huge, filesOnly, foldersOnly, path, ext, exclude, or, regex
+
+    var id: String { rawValue }
+
+    /// Text inserted into the query. Tokens ending in ":" or a symbol expect the user to keep typing.
+    var token: String {
+        switch self {
+        case .today: return "dm:today"
+        case .thisWeek: return "dm:thisweek"
+        case .lastMonth: return "dm:lastmonth"
+        case .big: return "size:>100mb"
+        case .huge: return "size:>1gb"
+        case .filesOnly: return "file:"
+        case .foldersOnly: return "folder:"
+        case .path: return "path:"
+        case .ext: return "ext:"
+        case .exclude: return "!"
+        case .or: return "|"
+        case .regex: return "regex:"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .today: return "Today"
+        case .thisWeek: return "This Week"
+        case .lastMonth: return "Last Month"
+        case .big: return "> 100 MB"
+        case .huge: return "> 1 GB"
+        case .filesOnly: return "Files Only"
+        case .foldersOnly: return "Folders Only"
+        case .path: return "In Path…"
+        case .ext: return "Extension…"
+        case .exclude: return "Exclude…"
+        case .or: return "OR"
+        case .regex: return "Regex…"
+        }
+    }
+
+    /// Complete filters toggle on/off; partial ones are inserted and wait for input.
+    var isComplete: Bool {
+        switch self {
+        case .today, .thisWeek, .lastMonth, .big, .huge, .filesOnly, .foldersOnly: return true
+        default: return false
+        }
+    }
+
+    /// ⌃⌥-shortcut shown in the Query menu.
+    var key: Character {
+        switch self {
+        case .today: return "t"
+        case .thisWeek: return "w"
+        case .lastMonth: return "m"
+        case .big: return "b"
+        case .huge: return "g"
+        case .filesOnly: return "f"
+        case .foldersOnly: return "d"
+        case .path: return "p"
+        case .ext: return "e"
+        case .exclude: return "x"
+        case .or: return "o"
+        case .regex: return "r"
+        }
+    }
+
+    /// Chips shown under the search field.
+    static let bar: [QuickQuery] = [.today, .thisWeek, .lastMonth, .big, .huge, .path, .ext, .exclude, .or]
+
+    /// Returns the query with this token toggled (complete tokens) or appended (partial ones).
+    func apply(to query: String) -> String {
+        var parts = query.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        if isComplete, let i = parts.firstIndex(of: token) {
+            parts.remove(at: i)
+            return parts.joined(separator: " ")
+        }
+        let base = parts.joined(separator: " ")
+        let sep = base.isEmpty ? "" : " "
+        switch self {
+        case .or: return base + " | "
+        case .exclude: return base + sep + "!"
+        default: return base + sep + token + (isComplete ? " " : "")
+        }
+    }
+
+    func isActive(in query: String) -> Bool {
+        isComplete && query.split(separator: " ").contains { $0 == token }
+    }
+}
+
+extension Notification.Name {
+    static let quickQuery = Notification.Name("quickQuery")
+}
+
 // MARK: - Main view
 
 struct ContentView: View {
@@ -124,6 +220,7 @@ struct ContentView: View {
             headerBar
             PermissionView()
             searchBar
+            if !viewModel.isContentSearch { quickBar }
             metaBar
             DoubleRule(color: palette.ink)
                 .padding(.horizontal, 24)
@@ -139,6 +236,9 @@ struct ContentView: View {
         .preferredColorScheme(palette.isDark ? .dark : .light)
         .onChange(of: viewModel.searchText) { selectedIndex = 0 }
         .onChange(of: searchOptions.typeFilter) { selectedIndex = 0 }
+        .onReceive(NotificationCenter.default.publisher(for: .quickQuery)) { note in
+            if let raw = note.object as? String, let q = QuickQuery(rawValue: raw) { applyQuick(q) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .rebuildIndex)) { _ in
             viewModel.rebuildIndex()
         }
@@ -285,6 +385,43 @@ struct ContentView: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Search options")
+    }
+
+    // MARK: Quick query chips
+
+    private var quickBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                Text("QUICK")
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                    .tracking(1.2)
+                    .foregroundStyle(palette.muted)
+                    .padding(.trailing, 2)
+                ForEach(QuickQuery.bar) { q in
+                    QuickChip(title: q.title, token: q.token,
+                              isOn: q.isActive(in: viewModel.searchText)) { applyQuick(q) }
+                        .help("\(q.token)   ⌃⌥\(String(q.key).uppercased())")
+                }
+                Button {
+                    SearchSyntaxHelpWindowController.shared.showWindow()
+                } label: {
+                    Text("Syntax ⇧⌘/")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(palette.accent)
+                        .underline()
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 4)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 1)
+        }
+        .padding(.bottom, 10)
+    }
+
+    private func applyQuick(_ q: QuickQuery) {
+        viewModel.searchText = q.apply(to: viewModel.searchText)
+        isSearchFieldFocused = true
     }
 
     // MARK: Meta strip (status + sort)
@@ -588,6 +725,35 @@ private struct DoubleRule: View {
             Rectangle().fill(color).frame(height: 1.5)
             Rectangle().fill(color).frame(height: 1)
         }
+    }
+}
+
+private struct QuickChip: View {
+    let title: String
+    let token: String
+    let isOn: Bool
+    let action: () -> Void
+    @Environment(\.palette) private var palette
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11.5, weight: isOn ? .semibold : .regular))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3.5)
+                .foregroundStyle(isOn ? palette.surface : palette.ink.opacity(0.85))
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(isOn ? palette.accent : (hovered ? palette.surface : Color.clear))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(isOn ? palette.accent : palette.rule, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
     }
 }
 

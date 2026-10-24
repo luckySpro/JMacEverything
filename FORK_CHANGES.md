@@ -15,6 +15,11 @@ Fork of [joshua-wu/MacEverything](https://github.com/joshua-wu/MacEverything) (M
 
 ![Color cards (design mock)](docs/design/color-cards.png)
 
+## Quick query (Everything syntax without typing it)
+- A **QUICK** chip row under the search field: Today · This Week · Last Month · > 100 MB · > 1 GB · In Path… · Extension… · Exclude… · OR. Complete filters toggle on/off (highlighted when active); partial ones insert the prefix and leave the caret ready to type.
+- **Query** menu with ⌃⌥ shortcuts: ⌃⌥T today, ⌃⌥W this week, ⌃⌥M last month, ⌃⌥B > 100 MB, ⌃⌥G > 1 GB, ⌃⌥F files only, ⌃⌥D folders only, ⌃⌥P `path:`, ⌃⌥E `ext:`, ⌃⌥X exclude `!`, ⌃⌥O OR `|`, ⌃⌥R `regex:`
+- Existing helpers still apply: Tab accepts the grey auto-complete (`ex` → `ext:`), ⇧⌘/ opens the full syntax reference.
+
 ## New features
 | Feature | How |
 |---|---|

@@ -31,6 +31,15 @@ struct MacEverythingApp: App {
                 }
             }
 
+            CommandMenu("Query") {
+                ForEach(QuickQuery.allCases) { q in
+                    Button("\(q.title)   \(q.token)") {
+                        NotificationCenter.default.post(name: .quickQuery, object: q.rawValue)
+                    }
+                    .keyboardShortcut(KeyEquivalent(q.key), modifiers: [.control, .option])
+                }
+            }
+
             CommandGroup(replacing: .help) {
                 Button("Search Syntax Help") {
                     SearchSyntaxHelpWindowController.shared.showWindow()

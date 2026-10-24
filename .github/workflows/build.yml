@@ -25,7 +25,13 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          make test-fast 2>&1 | tee core-tests.log
+          make test-fast > core-tests.log 2>&1; status=$?
+          # Summarise as annotations (readable from the Checks API)
+          grep -E "error:" core-tests.log | head -10 | sed 's/^/::error::/'
+          grep -F "[FAIL]" core-tests.log | sort | uniq -c | head -30 | sed 's/^ *//; s/^/::warning::/'
+          grep -E "Tests (passed|failed):" core-tests.log | tr '\n' ' ' | sed 's/^/::notice::/'; echo
+          tail -20 core-tests.log
+          exit $status
 
       - uses: actions/upload-artifact@v4
         if: always()
